@@ -1,0 +1,924 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<title>Trắc nghiệm tạo CSDL QLĐT trên PostgreSQL (V2)</title>
+<style>
+:root{
+  --bg:#f4f5f9; --card:#ffffff; --ink:#15172b; --ink2:#4a4e66; --muted:#767a92;
+  --line:#dfe1ea; --accent:#1b1f8a; --accent-ink:#ffffff; --accent-soft:#e9eafb;
+  --ok:#137a43; --ok-soft:#e5f5ec; --bad:#b42318; --bad-soft:#fdecea; --warn:#8a5a00; --warn-soft:#fff5dc;
+  --bar:#3a41c6; --track:#e6e7f0; --focus:#5b61ff;
+  --radius:14px; --shadow:0 1px 2px rgba(20,22,50,.06),0 4px 14px rgba(20,22,50,.05);
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#0f1120; --card:#181b2e; --ink:#eceef8; --ink2:#b8bbd2; --muted:#8c90aa;
+    --line:#2b2f48; --accent:#8f95ff; --accent-ink:#0f1120; --accent-soft:#23264a;
+    --ok:#5fd394; --ok-soft:#14301f; --bad:#ff8a7f; --bad-soft:#3a1714; --warn:#f2c255; --warn-soft:#352a0c;
+    --bar:#8f95ff; --track:#2b2f48; --focus:#a9adff;
+    --shadow:none;
+  }
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif}
+.wrap{max-width:820px;margin:0 auto;padding:16px 16px 120px}
+h1{font-size:1.35rem;line-height:1.3;margin:6px 0 2px}
+h2{font-size:1.1rem;margin:0 0 10px}
+h3{font-size:1rem;margin:0 0 6px}
+.sub{color:var(--ink2);margin:0 0 14px;font-size:.95rem}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:16px;margin:12px 0;box-shadow:var(--shadow)}
+label.f{display:block;font-size:.85rem;color:var(--ink2);margin:0 0 4px}
+input[type=text],input[type=password],select{width:100%;font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px 12px;min-height:44px}
+input:focus-visible,select:focus-visible,button:focus-visible,summary:focus-visible{outline:3px solid var(--focus);outline-offset:2px}
+.grid3{display:grid;grid-template-columns:1fr;gap:10px}
+@media(min-width:620px){.grid3{grid-template-columns:2fr 1fr 1fr}}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+button{font:inherit;font-weight:600;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--ink);padding:10px 16px;min-height:44px;cursor:pointer}
+button.pri{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+button:disabled{opacity:.5;cursor:not-allowed}
+.seg{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.seg label{flex:1 1 220px;display:flex;gap:10px;align-items:flex-start;border:1px solid var(--line);border-radius:10px;padding:10px 12px;cursor:pointer}
+.seg input{margin-top:5px;accent-color:var(--accent)}
+.seg small{display:block;color:var(--muted)}
+/* thanh tiến độ */
+.sticky{position:sticky;top:0;z-index:5;background:var(--bg);padding:8px 0 6px}
+.prog{display:flex;align-items:center;gap:12px}
+.prog .t{font-size:.9rem;color:var(--ink2);white-space:nowrap}
+.prog .tr{flex:1;height:8px;background:var(--track);border-radius:4px;overflow:hidden}
+.prog .fi{height:100%;width:0;background:var(--bar);border-radius:4px;transition:width .2s}
+/* câu hỏi */
+.q{scroll-margin-top:60px}
+.part{font-size:.85rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--accent);margin:22px 4px 4px}
+.q .num{display:inline-block;font-weight:700;color:var(--accent);margin-right:4px}
+.q .stem{margin:0 0 10px}
+.fig{margin:8px 0 12px;background:#fff;border:1px solid var(--line);border-radius:10px;padding:6px;cursor:zoom-in;position:relative}
+.fig img{display:block;width:100%;height:auto}
+.fig .figscroll{overflow-x:auto;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain}
+.fig .hint{display:none;font-size:.75rem;color:#4a4e66;text-align:center;margin:4px 0 0;padding:0 32px}
+.fig.wide .hint{display:block}
+.fig .zoom{position:absolute;right:4px;bottom:4px;width:26px;height:26px;display:flex;align-items:center;justify-content:center;background:rgba(20,22,50,.55);color:#fff;font-size:.85rem;border-radius:6px}
+.fig.small img{max-width:360px;margin:0 auto}
+.opts{display:grid;gap:8px}
+.opt{display:flex;gap:10px;align-items:flex-start;border:1.5px solid var(--line);border-radius:10px;padding:10px 12px;cursor:pointer;min-height:48px}
+.opt input{position:absolute;opacity:0;pointer-events:none}
+.opt .L{flex:0 0 28px;height:28px;border-radius:50%;border:1.5px solid var(--muted);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.9rem;color:var(--ink2)}
+.opt .tx{padding-top:2px}
+.opt.sel{border-color:var(--accent);background:var(--accent-soft)}
+.opt.sel .L{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.opt:has(input:focus-visible){outline:3px solid var(--focus);outline-offset:2px}
+.graded .opt{cursor:default}
+.opt.isKey{border-color:var(--ok);background:var(--ok-soft)}
+.opt.isKey .L{background:var(--ok);border-color:var(--ok);color:#fff}
+.opt.isWrong{border-color:var(--bad);background:var(--bad-soft)}
+.opt.isWrong .L{background:var(--bad);border-color:var(--bad);color:#fff}
+.tag{display:inline-block;font-size:.75rem;font-weight:700;padding:2px 8px;border-radius:999px;margin-left:6px;vertical-align:middle}
+.tag.ok{background:var(--ok-soft);color:var(--ok)}
+.tag.bad{background:var(--bad-soft);color:var(--bad)}
+.tag.skip{background:var(--warn-soft);color:var(--warn)}
+.q.r-ok{border-left:5px solid var(--ok)}
+.q.r-bad{border-left:5px solid var(--bad)}
+.fb{margin-top:12px;padding:12px;border-radius:10px;background:var(--bg);border:1px solid var(--line);font-size:.95rem}
+.fb b.k{color:var(--ok)}
+.fb .cap{font-size:.85rem;color:var(--ink2);margin:4px 0 0}
+.code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.88rem;line-height:2.1;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:8px 10px;margin:4px 0 10px;overflow-wrap:anywhere}
+.code .cl{white-space:pre-wrap;padding-left:1.6em;text-indent:-1.6em}
+select.blank{width:auto;font:inherit;font-weight:700;min-height:36px;max-width:100%;padding:2px 6px;margin:2px 1px;border:1.5px dashed var(--accent);border-radius:8px;background:var(--card);color:var(--accent);vertical-align:middle}
+select.blank.filled{border-style:solid;background:var(--accent-soft)}
+select.blank.act{outline:3px solid var(--focus);outline-offset:1px}
+select.blank.ok{border:2px solid var(--ok);background:var(--ok-soft);color:var(--ok)}
+select.blank.bad{border:2px solid var(--bad);background:var(--bad-soft);color:var(--bad)}
+select.blank:disabled{opacity:1}
+.bank{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0 4px}
+.chip{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-weight:700;font-size:.9rem;min-height:44px;min-width:44px;padding:6px 12px;border-radius:999px;border:1.5px solid var(--line);background:var(--card);color:var(--ink)}
+.chip.used{opacity:.4;text-decoration:line-through}
+.graded .chip{pointer-events:none}
+.bankhint{margin:2px 0 0}
+.kcode{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.88rem}
+.gtag{font-size:.75rem;color:var(--muted);display:block;margin-bottom:4px}
+.submitbox{margin-top:16px}
+.warnmsg{color:var(--warn);background:var(--warn-soft);padding:10px 12px;border-radius:10px;margin:10px 0 0;font-size:.95rem}
+/* kết quả */
+.score{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.score .big{font-size:2.6rem;font-weight:800;line-height:1;color:var(--accent)}
+.score .of{color:var(--ink2)}
+.pass{display:inline-block;margin-top:8px;font-weight:700;padding:6px 12px;border-radius:999px}
+.pass.y{background:var(--ok-soft);color:var(--ok)}
+.pass.n{background:var(--bad-soft);color:var(--bad)}
+.chart{display:grid;gap:12px;margin-top:6px}
+.bar .lab{display:flex;justify-content:space-between;gap:8px;font-size:.9rem}
+.bar .lab span:last-child{color:var(--ink2);white-space:nowrap;font-variant-numeric:tabular-nums}
+.bar .tr{height:14px;background:var(--track);border-radius:4px;margin-top:4px;position:relative}
+.bar .fi{height:100%;background:var(--bar);border-radius:4px;min-width:0}
+.bar .need{font-size:.75rem;font-weight:700;color:var(--bad);margin-left:6px}
+.bar .tick{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--ink2);opacity:.5;left:70%}
+.legend{font-size:.8rem;color:var(--muted);margin-top:8px}
+.wrong-list{display:grid;gap:8px;margin-top:4px}
+.wrong-list a{color:var(--accent)}
+details.how{border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--bg)}
+details.how summary{cursor:pointer;font-weight:600}
+details.how ol{padding-left:20px;margin:10px 0 4px}
+details.how li{margin:6px 0}
+.note{font-size:.85rem;color:var(--ink2)}
+.ai-item{border:1px solid var(--line);border-radius:10px;padding:12px;margin:10px 0;background:var(--bg)}
+.ai-item h4{margin:0 0 8px;font-size:.95rem}
+.ai-item dl{margin:0}
+.ai-item dt{font-weight:700;font-size:.85rem;color:var(--accent);margin-top:8px}
+.ai-item dd{margin:2px 0 0}
+.ai-item pre,.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.85rem;white-space:pre-wrap;word-break:break-word;margin:4px 0 0}
+.plan li{margin:8px 0}
+.spinner{display:inline-block;width:16px;height:16px;border:2px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:sp 1s linear infinite;vertical-align:-3px;margin-right:6px}
+@keyframes sp{to{transform:rotate(360deg)}}
+.err{color:var(--bad);background:var(--bad-soft);padding:10px 12px;border-radius:10px;margin-top:10px}
+.okmsg{color:var(--ok);background:var(--ok-soft);padding:10px 12px;border-radius:10px;margin-top:10px}
+.hidden{display:none!important}
+/* phóng to hình */
+#lb{position:fixed;inset:0;background:rgba(10,12,25,.92);z-index:50;display:flex;flex-direction:column}
+#lb .bar2{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;color:#fff;font-size:.9rem}
+#lb .sc{flex:1;overflow:auto;-webkit-overflow-scrolling:touch;padding:10px}
+#lb img{background:#fff;border-radius:6px;display:block;margin:auto;max-width:none}
+#lb button{background:#fff;color:#111;border:0}
+/* tự kiểm tra */
+#selftest table{width:100%;border-collapse:collapse;font-size:.9rem}
+#selftest td,#selftest th{border-bottom:1px solid var(--line);padding:6px 4px;text-align:left;vertical-align:top}
+#selftest table{table-layout:fixed}#selftest td{overflow-wrap:anywhere}#selftest th:last-child,#selftest td:last-child{width:64px}
+.P{color:var(--ok);font-weight:700}.F{color:var(--bad);font-weight:700}
+.eyebrowrow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px}
+.pill{display:inline-flex;align-items:center;gap:6px;font-size:.75rem;font-weight:700;letter-spacing:.04em;color:var(--warn);background:var(--warn-soft);border:1px solid color-mix(in srgb,var(--warn) 35%,transparent);padding:3px 10px;border-radius:999px}
+.pill .dot{width:9px;height:9px;border-radius:50%;border:1.5px solid currentColor}
+.eyebrow{font-size:.75rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.cap-lab{display:block;font-size:.75rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:14px 0 6px}
+#aiSetup h2{font-size:1.25rem;margin:0 0 6px}
+.keystate{font-size:.9rem;font-weight:600}
+.keystate.ok{color:var(--ok)} .keystate.bad{color:var(--bad)} .keystate.wait{color:var(--ink2);font-weight:400}
+footer{color:var(--muted);font-size:.8rem;text-align:center;margin-top:24px}
+@media print{
+  .sticky,.noprint,#aiSetup,#aiResult,details.how{display:none!important}
+  body{background:#fff;color:#000}
+  .card{box-shadow:none;break-inside:avoid}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Bài trắc nghiệm: Tạo cơ sở dữ liệu Quản lý đào tạo trên PostgreSQL</h1>
+    <p class="sub">46 câu · Theo hồ sơ case study FIT1203 (10/2026) · PostgreSQL 18 và pgAdmin 4. Câu chọn: chọn một phương án A–D. Câu điền mã: điền từ khoá vào từng ô (1), (2)…; câu chỉ tính đúng khi mọi ô đều đúng. Chọn một phương án cho mỗi câu, bấm <b>Nộp bài</b> để chấm ngay (không cần mạng).</p>
+  </header>
+
+  <section class="card noprint" id="aiSetup">
+    <div class="eyebrowrow"><span class="pill"><span class="dot"></span>AI</span><span class="eyebrow">Thiết lập trước khi làm bài (tuỳ chọn)</span></div>
+    <h2>Trợ lý AI Gemini</h2>
+    <p class="note" style="margin:0">Nhập API key Gemini của riêng em để sau khi nộp bài có thể xem giải thích chi tiết và gợi ý ôn tập do AI soạn riêng cho em. Không bắt buộc — không có key vẫn chấm điểm, xem đáp án và lời giải bình thường.</p>
+    <details class="how" id="howKey" style="margin-top:12px">
+      <summary>Cách lấy API key Gemini miễn phí (3 bước)</summary>
+      <ol>
+        <li>Mở <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a> ở tab mới, đăng nhập bằng tài khoản Google (lần đầu vào thì đồng ý điều khoản).</li>
+        <li>Bấm <b>"Create API key"</b>, chọn hoặc tạo một dự án khi được hỏi.</li>
+        <li>Sao chép chuỗi khoá vừa tạo và dán vào ô bên dưới, rồi bấm <b>Lưu API key</b>.</li>
+      </ol>
+      <p class="note">Gói miễn phí giới hạn số lượt gọi mỗi phút/ngày; nếu báo hết lượt, đợi một lúc rồi thử lại. Không chia sẻ key, không dán key lên nhóm chat hay chụp màn hình có key. Lỡ lộ key thì vào lại trang trên để xoá key cũ và tạo key mới.</p>
+    </details>
+    <label class="cap-lab" for="model">Mô hình Gemini</label>
+    <select id="model">
+      <option value="gemini-flash-lite-latest">Gemini Flash-Lite — miễn phí, nhẹ &amp; nhanh nhất</option>
+      <option value="gemini-flash-latest">Gemini Flash — giải thích kỹ hơn, vẫn miễn phí</option>
+    </select>
+    <p class="note" style="margin:4px 0 0">Mặc định dùng bản miễn phí. Đổi mô hình có hiệu lực ngay, không cần bấm Lưu.</p>
+    <label class="cap-lab" for="apiKey">API key</label>
+    <div class="row">
+      <input type="password" id="apiKey" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Dán API key vào đây" style="flex:1 1 240px">
+      <button type="button" id="showKey" aria-pressed="false">Hiện</button>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <button type="button" class="pri" id="saveKey">Lưu API key</button>
+      <span id="keyState" class="keystate wait" aria-live="polite"></span>
+    </div>
+    <div id="keyMsg"></div>
+    <p class="note" style="margin:12px 0 0"><b>Riêng tư:</b> khoá chỉ nằm trong bộ nhớ trình duyệt của phiên làm việc này — không ghi ra đĩa, không gửi cho giảng viên, chỉ được gửi thẳng tới Google khi em bấm nhờ AI. Trang không gửi họ tên hay mã SV. Vì nhiều học sinh có thể dùng chung một máy/điện thoại, khoá sẽ tự mất khi tải lại trang hoặc bấm “Làm lại”, để không lộ sang phiên của bạn tiếp theo.</p>
+  </section>
+
+  <section id="selftest" class="card hidden"></section>
+
+  <section class="card" id="infoCard">
+    <h2>Thông tin người làm</h2>
+    <div class="grid3">
+      <div><label class="f" for="hoTen">Họ và tên</label><input type="text" id="hoTen" autocomplete="name"></div>
+      <div><label class="f" for="maSV">Mã SV</label><input type="text" id="maSV" inputmode="text"></div>
+      <div><label class="f" for="lop">Lớp</label><input type="text" id="lop"></div>
+    </div>
+    <div class="seg hidden" id="modeSeg" role="radiogroup" aria-label="Chọn bộ câu hỏi"></div>
+  </section>
+
+  <div class="sticky noprint" id="stickyBar">
+    <div class="prog"><span class="t" id="progTxt">Đã làm 0</span><div class="tr"><div class="fi" id="progFill"></div></div>
+      <button class="pri" id="topSubmit" type="button">Nộp bài</button></div>
+  </div>
+
+  <section id="resultCard" class="card hidden" aria-live="polite"></section>
+
+  <section class="card noprint hidden" id="aiResult">
+    <h2>Trợ lý AI: giải thích lỗi và gợi ý ôn tập</h2>
+    <p class="note" id="aiKeyState" style="margin:0 0 10px"></p>
+    <button class="pri" type="button" id="askAI" style="width:100%">Nhờ AI giải thích lỗi và gợi ý luyện tập tuần tới</button>
+    <p class="note" id="aiHint"></p>
+    <div id="aiOut"></div>
+  </section>
+
+  <section class="card hidden" id="legendCard"></section>
+
+  <main id="qs"></main>
+
+  <div class="submitbox noprint" id="submitBox">
+    <button class="pri" id="submitBtn" type="button" style="width:100%">Nộp bài và chấm điểm</button>
+    <div id="submitWarn" class="warnmsg hidden"></div>
+  </div>
+
+
+  <footer>Phiếu tạo CSDL QLĐT trên pgAdmin 4 (V2) · Trường Đại học Thăng Long – FIT1203 · Phần chấm điểm chạy hoàn toàn trên máy, không cần mạng. Tiến độ làm bài được lưu tạm trên trình duyệt này.</footer>
+</div>
+
+<div id="lb" class="hidden" role="dialog" aria-modal="true" aria-label="Hình phóng to">
+  <div class="bar2"><span>Kéo để xem, chụm/giãn hai ngón để phóng to</span><button type="button" id="lbClose">Đóng ✕</button></div>
+  <div class="sc" id="lbSc"><img id="lbImg" alt=""></div>
+</div>
+
+<script>
+"use strict";
+/* ====== DỮ LIỆU (do build.py điền) ====== */
+const CFG = {"n": 46, "store": "qldt_pgadmin_v2", "result_title": "Tạo CSDL Quản lý đào tạo trên PostgreSQL (V2, 46 câu)", "groups_label": "nhóm kỹ năng", "multi_group": true, "full_time": "", "pack_label": "", "pack_time": "", "legend_html": "<h2>Hướng dẫn làm bài<\/h2><p class=\"note\" style=\"margin:0 0 6px\"><b>Câu chọn một<\/b> (câu 1–3, 5–9, 31–41, 43–46): chọn một phương án A, B, C hoặc D. Đoạn lệnh trong khung xám là lệnh được chạy.<\/p><p class=\"note\" style=\"margin:0 0 6px\"><b>Câu điền mã<\/b> (câu 4, 10–30, 42): mỗi ô trống được đánh số (1), (2)… Chạm vào một ô rồi chạm thẻ từ khoá bên dưới đoạn mã, hoặc chọn từ khoá ngay trong ô. Mỗi thẻ dùng tối đa một lần; danh sách có cả từ nhiễu. Chạm lại thẻ đã dùng để gỡ ra.<\/p><p class=\"note\" style=\"margin:0\"><b>Thang điểm:<\/b> điểm = số câu đúng × 10 / 46. Câu điền mã chỉ tính đúng khi tất cả các ô đều đúng.<\/p>", "small": [], "imgw": {}, "doc_key": "A B A CREATE/DATABASE/TEMPLATE B B C B B CREATE/TABLE/KHOA/PRIMARY/KEY NOT/NULL/UNIQUE NOT/NULL/FOREIGN/KEY/REFERENCES/KHOA ON/DELETE/NO/ACTION MaNganh/NGANH/MaNganh NOT/NULL/DATE CHECK/IN NULL/LOP NOT/NULL/IN INTEGER/BETWEEN/AND PRIMARY/KEY/MaHP/MaHP_TQ HOCPHAN/MaHP_TQ/HOCPHAN/MaHP <> IN/LIKE SET/NULL MaSV/MaLHP/SINHVIEN/LOPHOCPHAN DECIMAL/BETWEEN/AND KHOA/NGANH/LOP/SINHVIEN/DANGKY DROP/TABLE/IF/EXISTS CONSTRAINT/CHECK CREATE/VIEW/AS B D A C B C D A B D C ,/,/,/(/)/; A D B C", "dist": "", "pack_key": "", "cov": null, "sys": "Bạn là trợ giảng học phần Cơ sở dữ liệu FIT1203 (đại học, Việt Nam), phần thực hành: tạo cơ sở dữ liệu Quản lý đào tạo (QLDT, 9 bảng KHOA, NGANH, LOP, SINHVIEN, GIANGVIEN, HOCPHAN, DIEUKIEN, LOPHOCPHAN, DANGKY) trên PostgreSQL bằng pgAdmin 4 và bằng câu lệnh SQL, theo các quy tắc nghiệp vụ QT-xx của hồ sơ case study.\nLuôn trả lời bằng tiếng Việt có dấu, giọng thân thiện, ngắn gọn, đúng thuật ngữ của lớp; viết từ khoá SQL bằng chữ in hoa. Bám sát đáp án và lời giải của giảng viên được cung cấp; không bao giờ mâu thuẫn với đáp án đó.\n\nKiến thức chuẩn (dùng làm \"quy tắc\" khi giải thích):\n- pgAdmin 4: tạo database bằng chuột phải Databases → Create → Database...; bảng mã UTF8, Template, Collation ở tab Definition; Query Tool chạy trên database đang chọn khi mở, xem thanh tiêu đề qldt/postgres@... hoặc SELECT current_database(); bảng nằm ở qldt → Schemas → public → Tables; khoá chính bật Primary key? ở tab Columns; khoá ngoại ở tab Constraints → Foreign Key; tab SQL cho xem câu lệnh pgAdmin sẽ chạy.\n- Tên không đặt trong ngoặc kép được PostgreSQL đổi về chữ thường; gõ MaKhoa trên giao diện sinh ra \"MaKhoa\" phân biệt hoa thường nên câu lệnh không ngoặc kép không khớp → đặt tên chữ thường khi dùng giao diện.\n- CREATE DATABASE qldt ENCODING 'UTF8' TEMPLATE template0; CREATE TABLE tên ( cột kiểu ràng_buộc, ... ); CREATE VIEW tên AS SELECT ... (thuộc tính dẫn xuất như điểm tổng kết không lưu trong bảng, QT-24); DROP TABLE IF EXISTS tên; xoá bảng con trước bảng cha; DROP xoá cấu trúc, DELETE chỉ xoá dữ liệu.\n- Khoá chính một cột: PRIMARY KEY ngay sau cột. Khoá chính ghép: CONSTRAINT pk_... PRIMARY KEY (cột1, cột2) một lần ở mức bảng; viết PRIMARY KEY sau từng cột báo lỗi multiple primary keys. Mỗi bảng chỉ một khoá chính; cột khác cần không trùng thì dùng UNIQUE.\n- Khoá ngoại: CONSTRAINT fk_... FOREIGN KEY (cột của bảng đang tạo) REFERENCES BẢNG_CHA(khoá chính của bảng cha); đặt ở phía \"nhiều\"; \"đúng một\" → cột khoá ngoại NOT NULL; tham gia tuỳ chọn (0..1) → cho phép NULL. Liên kết đệ quy DIEUKIEN: hai khoá ngoại MaHP và MaHP_TQ cùng trỏ về HOCPHAN(MaHP). Bảng được tham chiếu phải tạo trước (KHOA → NGANH → LOP → SINHVIEN → DANGKY), sai thứ tự báo relation ... does not exist.\n- ON DELETE NO ACTION (mặc định) từ chối xoá dòng cha còn dòng con; ON DELETE SET NULL đưa khoá ngoại về rỗng (cột phải cho phép NULL); ON DELETE CASCADE xoá luôn dòng con.\n- CHECK giới hạn miền giá trị: IN ('Nam','Nữ'); BETWEEN 1 AND 6 gồm cả hai đầu; LIKE '____-____' mỗi dấu _ khớp đúng một ký tự, chỉ kiểm khuôn dạng; <> là \"khác\" (PostgreSQL cũng nhận !=); giá trị NULL vẫn qua được CHECK. Kiểu: DATE cho ngày, INTEGER cho số nguyên, DECIMAL(4,2) cho điểm hai chữ số thập phân (lưu được đến 99.99 nên cần CHECK 0–10). Đặt tên ràng buộc bằng CONSTRAINT tên để thông báo lỗi chỉ rõ quy tắc bị vi phạm.\n- Câu điền mã chỉ tính đúng khi mọi ô đều đúng; giải thích từng ô sai.\n- Tên trong ngoặc kép giữ nguyên hoa thường và phải gọi lại đúng y như vậy kèm ngoặc kép; tên không ngoặc kép được đổi về chữ thường nên KHOA, MaKhoa viết trong Query Tool vẫn hợp lệ (lưu là khoa, makhoa). Giao diện pgAdmin tự thêm ngoặc kép khi tên có chữ hoa.\n- Từ ERD đến lược đồ: 7 thực thể sinh 7 bảng; liên kết M:N (DANGKY giữa SINHVIEN–LOPHOCPHAN, DIEUKIEN đệ quy trên HOCPHAN) tách thành bảng riêng mang thuộc tính của liên kết (DiemQuaTrinh, DiemThi); liên kết 1:N đặt khoá ngoại ở phía nhiều, \"đúng một\" thì NOT NULL. Script 9 bảng có 11 khoá ngoại; chỉ KHOA không có khoá ngoại. Khoá chính (MaSV, MaLHP) cho phép sinh viên học lại ở lớp học phần khác. Quy tắc cần dữ liệu ở bảng khác (QT-33) không viết được bằng UNIQUE/CHECK, phải dùng trigger.\n- Kiểm thử: CHECK gặp NULL cho UNKNOWN nên vẫn chấp nhận; INSERT mã không có ở bảng cha bị từ chối (violates foreign key constraint); DELETE dòng cha còn được tham chiếu bị từ chối khi không ghi ON DELETE (NO ACTION).\n- Lỗi cú pháp hay gặp: dấu phẩy thừa sau phần tử cuối → syntax error at or near \")\"; FOREIGN KEY (cột) phải có ngoặc; ; kết thúc lệnh, thiếu ; giữa hai lệnh → syntax error at or near \"CREATE\" và không lệnh nào chạy; 'chuỗi' dùng nháy đơn, \"Tên\" là định danh (\"Nam\" bị hiểu là cột → column \"Nam\" does not exist); cột khoá ngoại phải cùng kiểu với cột được tham chiếu (integer và character varying không tương thích).", "ai_vi_du": "một ví dụ MỚI ngoài bối cảnh câu hỏi (thư viện, bán hàng, bệnh viện…), là một đoạn SQL PostgreSQL ngắn 1-4 dòng minh hoạ đúng quy tắc, kèm 1 câu giải thích", "ai_bai_tu_luyen": "một bài tập nhỏ tự soạn: cho một quy tắc nghiệp vụ mới, yêu cầu viết câu CREATE TABLE có khoá chính, khoá ngoại và CHECK phù hợp, kèm đáp án SQL ngắn ở cuối", "ai_advanced": "tự viết đủ script 9 bảng QLDT không nhìn mẫu, nạp dữ liệu và thử vi phạm từng ràng buộc để đọc thông báo lỗi, viết thêm khung nhìn và chỉ mục"};
+const Q = [{"n": 1, "type": "mc", "t": "[pgAdmin · tạo database] Trong pgAdmin 4, muốn tạo database mới tên qldt, bạn thao tác thế nào?", "f": null, "o": ["Chuột phải vào Databases → Create → Database...", "Chuột phải vào Tables → Create → Table...", "Mở Tools → Query Tool rồi bấm Save", "Chuột phải vào Login/Group Roles → Create → Login/Group Role..."], "gs": ["G1"], "part": "PHẦN A. TẠO CƠ SỞ DỮ LIỆU"}, {"n": 2, "type": "mc", "t": "[pgAdmin · bảng mã] Ở hộp thoại Create – Database, chọn bảng mã UTF8 để lưu được tên tiếng Việt có dấu ở tab nào?", "f": null, "o": ["General", "Definition", "Security", "SQL"], "gs": ["G1"]}, {"n": 3, "type": "mc", "t": "[pgAdmin · Query Tool] Trước khi chạy script tạo 9 bảng, làm sao biết Query Tool đang mở đúng database qldt?", "f": null, "o": ["Thanh tiêu đề của Query Tool ghi qldt/postgres@...", "Tên tab luôn là Query Tool nên không cần kiểm tra", "Query Tool tự chọn database mới tạo gần nhất", "Chạy SELECT version(); và xem kết quả có chữ qldt"], "gs": ["G1"]}, {"n": 4, "type": "fill", "t": "[SQL · CREATE DATABASE] Hoàn thành câu lệnh tạo cơ sở dữ liệu qldt dùng bảng mã UTF8.", "f": null, "code": [[{"b": 0}, {"b": 1}, "qldt"], ["ENCODING 'UTF8'", {"b": 2}, "template0;"]], "bank": ["SCHEMA", "TEMPLATE", "TABLE", "NEW", "CREATE", "DATABASE", "MAKE"], "gs": ["G2"]}, {"n": 5, "type": "mc", "t": "[pgAdmin · tạo bảng] Để mở hộp thoại tạo bảng KHOA trong database qldt, bạn chuột phải vào mục nào trong Object Explorer?", "f": null, "o": ["Servers", "qldt → Schemas → public → Tables", "qldt → Casts", "Login/Group Roles"], "gs": ["G1"], "part": "PHẦN B. TẠO BẢNG VÀ LIÊN KẾT TRÊN GIAO DIỆN PGADMIN"}, {"n": 6, "type": "mc", "t": "[pgAdmin · khoá chính] Khi tạo bảng KHOA bằng giao diện, khai báo cột makhoa là khoá chính ở đâu?", "f": null, "o": ["Tab General, ô Name", "Tab Columns, bật công tắc Primary key? ở dòng makhoa", "Tab Advanced, ô Of type", "Tab Security, mục Privileges"], "gs": ["G1"]}, {"n": 7, "type": "mc", "t": "[pgAdmin · khoá ngoại] Tạo liên kết NGANH → KHOA (khoá ngoại fk_nganh_khoa) trên giao diện, bạn vào đâu?", "f": null, "o": ["Tab Columns, bật Not NULL? cho cột makhoa", "Tab Constraints → Unique → +", "Tab Constraints → Foreign Key → +, rồi chọn Local column makhoa, References public.khoa, Referencing makhoa", "Tab Advanced → Inherited from table(s) chọn khoa"], "gs": ["G1"]}, {"n": 8, "type": "mc", "t": "[pgAdmin · đặt tên] Vì sao khi tạo bảng bằng giao diện nên gõ tên bảng và tên cột bằng chữ thường (khoa, makhoa)?", "f": null, "o": ["PostgreSQL không cho phép chữ hoa trong tên", "Gõ MaKhoa thì pgAdmin sinh ra \"MaKhoa\" trong ngoặc kép, tên phân biệt hoa thường, và câu SELECT MaKhoa ... sẽ báo không tìm thấy cột", "Tên chữ thường làm truy vấn chạy nhanh hơn", "Bảng mã UTF8 chỉ nhận chữ thường"], "gs": ["G1"]}, {"n": 9, "type": "mc", "t": "[pgAdmin · tab SQL] Tab SQL trong hộp thoại Create – Table dùng để làm gì?", "f": null, "o": ["Nhập dữ liệu mẫu cho bảng", "Xem câu lệnh CREATE TABLE mà pgAdmin sẽ chạy khi bấm Save", "Chạy câu SELECT kiểm tra bảng", "Xem lịch sử các lệnh đã chạy"], "gs": ["G1"]}, {"n": 10, "type": "fill", "t": "[KHOA · QT-01] Kéo và thả đoạn mã còn thiếu để tạo bảng KHOA có khoá chính MaKhoa.", "f": null, "code": [[{"b": 0}, {"b": 1}, {"b": 2}, "("], ["MaKhoa VARCHAR(10)", {"b": 3}, {"b": 4}, ","], ["TenKhoa VARCHAR(100) NOT NULL UNIQUE"], [");"]], "bank": ["PRIMARY", "INSERT", "FOREIGN", "MAKE", "KEY", "TABLE", "KHOA", "CREATE", "DATABASE"], "gs": ["G2", "G3"], "part": "PHẦN C. CÚ PHÁP SQL TẠO 9 BẢNG QLDT"}, {"n": 11, "type": "fill", "t": "[KHOA · QT-01] Tên khoa bắt buộc phải có và không được trùng giữa hai khoa. Hoàn thành khai báo cột TenKhoa.", "f": null, "code": [["CREATE TABLE KHOA ("], ["MaKhoa VARCHAR(10) PRIMARY KEY,"], ["TenKhoa VARCHAR(100)", {"b": 0}, {"b": 1}, {"b": 2}], [");"]], "bank": ["NULL", "DEFAULT", "DISTINCT", "NOT", "UNIQUE", "PRIMARY", "CHECK"], "gs": ["G6"]}, {"n": 12, "type": "fill", "t": "[NGANH · QT-02] Mỗi ngành do đúng một khoa quản lý. Hoàn thành cột MaKhoa và khoá ngoại của bảng NGANH.", "f": null, "code": [["CREATE TABLE NGANH ("], ["MaNganh VARCHAR(10) PRIMARY KEY,"], ["TenNganh VARCHAR(100) NOT NULL,"], ["MaKhoa VARCHAR(10)", {"b": 0}, {"b": 1}, ","], ["CONSTRAINT fk_nganh_khoa"], [{"b": 2}, {"b": 3}, "(MaKhoa)", {"b": 4}, {"b": 5}, "(MaKhoa)"], [");"]], "bank": ["NULL", "NGANH", "FOREIGN", "LINK", "REFERENCES", "NOT", "PRIMARY", "KHOA", "KEY"], "gs": ["G4", "G6"]}, {"n": 13, "type": "fill", "t": "[NGANH · QT-23] Không được xoá một khoa khi khoa còn ngành. Viết rõ hành vi khi xoá cho khoá ngoại fk_nganh_khoa.", "f": null, "code": [["CONSTRAINT fk_nganh_khoa FOREIGN KEY (MaKhoa)"], ["REFERENCES KHOA(MaKhoa)"], [{"b": 0}, {"b": 1}, {"b": 2}, {"b": 3}]], "bank": ["NO", "DROP", "UPDATE", "CASCADE", "ON", "SET", "ACTION", "DELETE"], "gs": ["G5"]}, {"n": 14, "type": "fill", "t": "[LOP · QT-04] Mỗi lớp thuộc đúng một ngành. Hoàn thành khoá ngoại của bảng LOP.", "f": null, "code": [["CREATE TABLE LOP ("], ["MaLop VARCHAR(15) PRIMARY KEY,"], ["TenLop VARCHAR(100) NOT NULL,"], ["MaNganh VARCHAR(10) NOT NULL,"], ["CONSTRAINT fk_lop_nganh FOREIGN KEY (", {"b": 0}, ")"], ["REFERENCES", {"b": 1}, "(", {"b": 2}, ")"], [");"]], "bank": ["MaLop", "LOP", "MaNganh", "KHOA", "NGANH", "MaNganh"], "gs": ["G4"]}, {"n": 15, "type": "fill", "t": "[SINHVIEN · QT-07] Họ tên bắt buộc; ngày sinh và giới tính được để trống khi hồ sơ nhập học chưa đủ. Hoàn thành khai báo cột.", "f": null, "code": [["CREATE TABLE SINHVIEN ("], ["MaSV VARCHAR(15) PRIMARY KEY,"], ["HoTen VARCHAR(100)", {"b": 0}, {"b": 1}, ","], ["NgaySinh", {"b": 2}, ","], ["GioiTinh VARCHAR(5),"], ["MaLop VARCHAR(15)"], [");"]], "bank": ["INTEGER", "VARCHAR(8)", "DATE", "NULL", "NOT", "UNIQUE"], "gs": ["G6"]}, {"n": 16, "type": "fill", "t": "[SINHVIEN · QT-08] Giới tính chỉ nhận một trong hai giá trị \"Nam\" hoặc \"Nữ\". Hoàn thành ràng buộc.", "f": null, "code": [["CONSTRAINT ck_sv_gioitinh"], [{"b": 0}, "(GioiTinh", {"b": 1}, "('Nam', 'Nữ'))"]], "bank": ["LIKE", "IN", "CHECK", "UNIQUE", "BETWEEN", "=", "DEFAULT"], "gs": ["G7"]}, {"n": 17, "type": "fill", "t": "[SINHVIEN · QT-06] Sinh viên mới nhập học có thể chưa được xếp lớp. Hoàn thành cột MaLop và khoá ngoại.", "f": null, "code": [["MaLop VARCHAR(15)", {"b": 0}, ","], ["CONSTRAINT fk_sv_lop FOREIGN KEY (MaLop)"], ["REFERENCES", {"b": 1}, "(MaLop)"]], "bank": ["NOT", "NULL", "PRIMARY", "KEY", "NULL", "SINHVIEN", "NGANH", "UNIQUE", "LOP"], "gs": ["G4", "G6"]}, {"n": 18, "type": "fill", "t": "[GIANGVIEN · QT-09, QT-10] Mỗi giảng viên thuộc đúng một khoa; học vị thuộc một danh sách hữu hạn. Hoàn thành bảng GIANGVIEN.", "f": null, "code": [["HocVi VARCHAR(20),"], ["MaKhoa VARCHAR(10)", {"b": 0}, {"b": 1}, ","], ["CONSTRAINT ck_gv_hocvi"], ["CHECK (HocVi", {"b": 2}, "('ThS', 'TS', 'PGS.TS', 'GS.TS'))"]], "bank": ["NULL", "LIKE", "BETWEEN", "NOT", "UNIQUE", "IN"], "gs": ["G6", "G7"]}, {"n": 19, "type": "fill", "t": "[HOCPHAN · QT-12] Số tín chỉ là số nguyên từ 1 đến 6. Hoàn thành khai báo.", "f": null, "code": [["SoTinChi", {"b": 0}, "NOT NULL,"], ["CONSTRAINT ck_hp_sotinchi"], ["CHECK (SoTinChi", {"b": 1}, "1", {"b": 2}, "6)"]], "bank": ["AND", "INTEGER", "OR", "BETWEEN", "IN", "TO", "VARCHAR(6)"], "gs": ["G6", "G7"]}, {"n": 20, "type": "fill", "t": "[DIEUKIEN · QT-13] Bảng DIEUKIEN có khoá chính ghép gồm hai cột. Hoàn thành ràng buộc khoá chính.", "f": null, "code": [["CREATE TABLE DIEUKIEN ("], ["MaHP VARCHAR(10) NOT NULL,"], ["MaHP_TQ VARCHAR(10) NOT NULL,"], ["CONSTRAINT pk_dieukien"], [{"b": 0}, {"b": 1}, "(", {"b": 2}, ",", {"b": 3}, ")"], [");"]], "bank": ["MaHP_TQ", "UNIQUE", "KEY", "FOREIGN", "MaHP", "MaLHP", "PRIMARY"], "gs": ["G3"]}, {"n": 21, "type": "fill", "t": "[DIEUKIEN · QT-13 (đệ quy)] Cả hai cột của DIEUKIEN đều là khoá ngoại. Hoàn thành hai khoá ngoại của mối liên kết đệ quy.", "f": null, "code": [["CONSTRAINT fk_dk_hp"], ["FOREIGN KEY (MaHP) REFERENCES", {"b": 0}, "(MaHP),"], ["CONSTRAINT fk_dk_hp_tq"], ["FOREIGN KEY (", {"b": 1}, ") REFERENCES", {"b": 2}, "(", {"b": 3}, ")"]], "bank": ["HOCPHAN", "MaHP", "HOCPHAN", "MaHP_TQ", "DIEUKIEN", "LOPHOCPHAN"], "gs": ["G4"]}, {"n": 22, "type": "fill", "t": "[DIEUKIEN · QT-14] Một học phần không được là tiên quyết của chính nó. Chọn toán tử đúng.", "f": null, "code": [["CONSTRAINT ck_dk_khac"], ["CHECK (MaHP", {"b": 0}, "MaHP_TQ)"]], "bank": ["<>", "==", "=", ">=", "IS", "LIKE"], "gs": ["G7"]}, {"n": 23, "type": "fill", "t": "[LOPHOCPHAN · QT-17] Học kỳ nhận 1, 2 hoặc 3; năm học có dạng \"2025-2026\". Hoàn thành hai ràng buộc CHECK.", "f": null, "code": [["HocKy INTEGER NOT NULL,"], ["NamHoc VARCHAR(12) NOT NULL,"], ["CONSTRAINT ck_lhp_hocky CHECK (HocKy", {"b": 0}, "(1, 2, 3)),"], ["CONSTRAINT ck_lhp_namhoc CHECK (NamHoc", {"b": 1}, "'____-____')"]], "bank": ["AS", "MATCH", "LIKE", "IN", "BETWEEN", "="], "gs": ["G7"]}, {"n": 24, "type": "fill", "t": "[LOPHOCPHAN · QT-16] Xoá một giảng viên thì các lớp người đó phụ trách trở về trạng thái chưa phân công. Hoàn thành khoá ngoại.", "f": null, "code": [["MaGV VARCHAR(10),"], ["CONSTRAINT fk_lhp_gv FOREIGN KEY (MaGV)"], ["REFERENCES GIANGVIEN(MaGV)"], ["ON DELETE", {"b": 0}, {"b": 1}]], "bank": ["RESTRICT", "SET", "CASCADE", "ACTION", "DEFAULT", "NULL", "NO"], "gs": ["G5"]}, {"n": 25, "type": "fill", "t": "[DANGKY · QT-19, QT-20] DANGKY sinh ra từ liên kết M:N giữa SINHVIEN và LOPHOCPHAN. Hoàn thành khoá chính và hai khoá ngoại.", "f": null, "code": [["CREATE TABLE DANGKY ("], ["MaSV VARCHAR(15) NOT NULL,"], ["MaLHP VARCHAR(15) NOT NULL,"], ["DiemQuaTrinh DECIMAL(4,2),"], ["DiemThi DECIMAL(4,2),"], ["CONSTRAINT pk_dangky PRIMARY KEY (", {"b": 0}, ",", {"b": 1}, "),"], ["CONSTRAINT fk_dk_sv FOREIGN KEY (MaSV) REFERENCES", {"b": 2}, "(MaSV),"], ["CONSTRAINT fk_dk_lhp FOREIGN KEY (MaLHP) REFERENCES", {"b": 3}, "(MaLHP)"], [");"]], "bank": ["HOCPHAN", "LOPHOCPHAN", "MaHP", "DANGKY", "SINHVIEN", "MaSV", "MaLHP"], "gs": ["G3", "G4"]}, {"n": 26, "type": "fill", "t": "[DANGKY · QT-21] Điểm thang 10, có hai chữ số thập phân; lượt chưa chấm thì để trống. Hoàn thành khai báo.", "f": null, "code": [["DiemQuaTrinh", {"b": 0}, "(4,2),"], ["DiemThi DECIMAL(4,2),"], ["CONSTRAINT ck_dk_dthi"], ["CHECK (DiemThi", {"b": 1}, "0", {"b": 2}, "10)"]], "bank": ["OR", "IN", "VARCHAR", "INTEGER", "BETWEEN", "AND", "DECIMAL"], "gs": ["G6", "G7"]}, {"n": 27, "type": "fill", "t": "[Thứ tự tạo bảng] Bảng được tham chiếu phải có trước. Kéo tên bảng vào đúng thứ tự chạy lệnh CREATE TABLE.", "f": null, "code": [["-- Thứ tự chạy CREATE TABLE trên chuỗi khoá ngoại"], ["1.", {"b": 0}], ["2.", {"b": 1}], ["3.", {"b": 2}], ["4.", {"b": 3}], ["5.", {"b": 4}]], "bank": ["LOP", "DANGKY", "SINHVIEN", "KHOA", "NGANH"], "gs": ["G4"]}, {"n": 28, "type": "fill", "t": "[Xoá bảng] Xoá bảng để chạy lại script, không báo lỗi nếu bảng chưa có. Hoàn thành câu lệnh (bảng con DANGKY xoá trước).", "f": null, "code": [[{"b": 0}, {"b": 1}, {"b": 2}, {"b": 3}, "DANGKY;"], ["DROP TABLE IF EXISTS LOPHOCPHAN;"]], "bank": ["TABLE", "EXISTS", "REMOVE", "DELETE", "DROP", "IF", "NOT"], "gs": ["G2"]}, {"n": 29, "type": "fill", "t": "[Đặt tên ràng buộc] Đặt tên cho ràng buộc để thông báo lỗi chỉ rõ quy tắc nào bị vi phạm.", "f": null, "code": [[{"b": 0}, "ck_hp_sotinchi", {"b": 1}, "(SoTinChi BETWEEN 1 AND 6)"]], "bank": ["AS", "NAME", "CONSTRAINT", "INDEX", "CHECK", "KEY"], "gs": ["G2"]}, {"n": 30, "type": "fill", "t": "[Khung nhìn · QT-24] Điểm tổng kết là thuộc tính dẫn xuất, không lưu trong bảng. Hoàn thành câu lệnh tạo khung nhìn.", "f": null, "code": [[{"b": 0}, {"b": 1}, "V_KETQUA", {"b": 2}], ["SELECT MaSV, MaLHP,"], ["ROUND(0.4 * DiemQuaTrinh + 0.6 * DiemThi, 2) AS DiemTongKet"], ["FROM DANGKY;"]], "bank": ["VIEW", "TABLE", "IS", "INSERT", "CREATE", "AS"], "gs": ["G2"]}, {"n": 31, "type": "mc", "t": "[ERD → lược đồ · số bảng] ERD QLDT có 7 thực thể (KHOA, NGANH, LOP, SINHVIEN, GIANGVIEN, HOCPHAN, LOPHOCPHAN) nhưng CSDL có 9 bảng. Hai bảng nào được sinh ra từ mối liên kết, không phải từ thực thể?", "f": null, "o": ["LOP và LOPHOCPHAN", "DIEUKIEN và DANGKY", "NGANH và DIEUKIEN", "DANGKY và LOPHOCPHAN"], "gs": ["G8"], "part": "PHẦN D. TÍNH LOGIC GIỮA ERD, LƯỢC ĐỒ, RÀNG BUỘC VÀ CÂU LỆNH"}, {"n": 32, "type": "mc", "t": "[Liên kết M:N · DANGKY] Một sinh viên đăng ký nhiều lớp học phần, một lớp học phần có nhiều sinh viên. Vì sao không thêm cột MaLHP vào bảng SINHVIEN mà phải tạo bảng DANGKY?", "f": null, "o": ["PostgreSQL không cho một bảng có quá 5 cột", "MaLHP là khoá chính của LOPHOCPHAN nên không được làm khoá ngoại ở bảng khác", "Bảng SINHVIEN đã có khoá ngoại MaLop nên không được thêm khoá ngoại thứ hai", "Mỗi dòng SINHVIEN chỉ chứa được một MaLHP; muốn lưu nhiều lớp phải lặp lại thông tin sinh viên hoặc nhét nhiều giá trị vào một ô (vi phạm 1NF), và không có chỗ lưu điểm của từng lượt đăng ký"], "gs": ["G8"]}, {"n": 33, "type": "mc", "t": "[LOPHOCPHAN · nhận diện khoá ngoại] Lược đồ LOPHOCPHAN(MaLHP, MaHP, MaGV, HocKy, NamHoc). Những thuộc tính nào là khoá ngoại?", "f": null, "o": ["MaHP và MaGV", "Chỉ MaHP", "MaLHP và MaHP", "MaHP, MaGV và NamHoc"], "gs": ["G4", "G8"]}, {"n": 34, "type": "mc", "t": "[Liên kết 1:N · hướng khoá ngoại] Một học phần mở được nhiều lớp học phần; mỗi lớp học phần thuộc đúng một học phần. Khoá ngoại đặt ở đâu?", "f": null, "o": ["Cột MaLHP trong HOCPHAN, tham chiếu LOPHOCPHAN(MaLHP)", "Thêm khoá ngoại ở cả hai bảng, tham chiếu lẫn nhau", "Cột MaHP NOT NULL trong LOPHOCPHAN, tham chiếu HOCPHAN(MaHP)", "Tạo bảng trung gian HOCPHAN_LOPHOCPHAN"], "gs": ["G4", "G8"]}, {"n": 35, "type": "mc", "t": "[Tổng số khoá ngoại] Script 9 bảng QLDT có tất cả bao nhiêu ràng buộc khoá ngoại, và bảng nào không có khoá ngoại nào?", "f": null, "o": ["9 khoá ngoại; KHOA và HOCPHAN không có", "11 khoá ngoại; chỉ KHOA không có", "11 khoá ngoại; KHOA và GIANGVIEN không có", "13 khoá ngoại; chỉ KHOA không có"], "gs": ["G8"]}, {"n": 36, "type": "mc", "t": "[DANGKY · học lại] Sinh viên SV1 trượt CSDL ở lớp LHP1 (2025-2026), năm sau đăng ký lớp LHP2 của cùng học phần. Khoá chính (MaSV, MaLHP) của DANGKY xử lý thế nào?", "f": null, "o": ["Từ chối vì trùng MaSV", "Từ chối vì hai lớp cùng một học phần", "Chấp nhận, vì cặp (SV1, LHP2) khác (SV1, LHP1); cả hai lần học đều được lưu", "Chấp nhận nhưng ghi đè điểm của lần học trước"], "gs": ["G3", "G8"]}, {"n": 37, "type": "mc", "t": "[QT-33 · vì sao dùng trigger] QT-33: trong cùng học kỳ, năm học, một sinh viên không đăng ký hai lớp học phần của cùng một học phần. Vì sao không viết được bằng UNIQUE hay CHECK trong bảng DANGKY?", "f": null, "o": ["PostgreSQL không hỗ trợ UNIQUE trên nhiều cột", "CHECK không được dùng toán tử AND", "Khoá chính (MaSV, MaLHP) đã bảo đảm QT-33", "MaHP, HocKy, NamHoc nằm ở bảng LOPHOCPHAN, không có trong DANGKY; CHECK chỉ xét các cột của dòng đang ghi, nên phải dùng trigger tra sang LOPHOCPHAN"], "gs": ["G8"]}, {"n": 38, "type": "mc", "t": "[Kiểm thử CHECK và NULL] SV1, LHP1, LHP2 đã có trong CSDL và SV1 chưa đăng ký lớp nào. Kết quả chạy hai lệnh sau?", "f": null, "o": ["(1) thành công; (2) bị từ chối do vi phạm ck_dk_dthi", "Cả hai đều bị từ chối", "(1) bị từ chối vì DiemThi rỗng; (2) thành công", "Cả hai thành công vì DECIMAL(4,2) chứa được 10.5"], "code": [["INSERT INTO DANGKY VALUES ('SV1', 'LHP1', 8, NULL); -- (1)"], ["INSERT INTO DANGKY VALUES ('SV1', 'LHP2', 7, 10.5); -- (2)"]], "gs": ["G7", "G9"]}, {"n": 39, "type": "mc", "t": "[Toàn vẹn tham chiếu · thêm] Lớp LHP99999 chưa có trong LOPHOCPHAN. Chạy lệnh sau thì sao?", "f": null, "o": ["PostgreSQL tự thêm LHP99999 vào LOPHOCPHAN", "Lỗi: violates foreign key constraint \"fk_dk_lhp\"", "Thành công, MaLHP được đặt NULL", "Lỗi vi phạm khoá chính pk_dangky"], "code": [["INSERT INTO DANGKY VALUES ('SV1', 'LHP99999', 7, 6);"]], "gs": ["G9"]}, {"n": 40, "type": "mc", "t": "[Toàn vẹn tham chiếu · xoá] SV1 đã có dòng trong DANGKY; khoá ngoại fk_dk_sv không ghi ON DELETE. Chạy lệnh sau thì sao?", "f": null, "o": ["Xoá SV1 và tự xoá luôn các dòng đăng ký của SV1", "Xoá SV1; MaSV trong DANGKY chuyển thành NULL", "Xoá thành công; DANGKY giữ nguyên dòng của SV1", "Bị từ chối: SV1 còn được tham chiếu từ DANGKY"], "code": [["DELETE FROM SINHVIEN WHERE MaSV = 'SV1';"]], "gs": ["G5", "G9"]}, {"n": 41, "type": "mc", "t": "[Dấu phẩy thừa] Chạy lệnh sau trong Query Tool thì sao?", "f": null, "o": ["Thành công, PostgreSQL bỏ qua dấu phẩy thừa", "Lỗi vì UNIQUE không được đi cùng NOT NULL", "Lỗi syntax error at or near \")\" do dấu phẩy thừa sau cột cuối", "Lỗi vì thiếu tên ràng buộc CONSTRAINT"], "code": [["CREATE TABLE KHOA ("], ["MaKhoa VARCHAR(10) PRIMARY KEY,"], ["TenKhoa VARCHAR(100) NOT NULL UNIQUE,"], [");"]], "gs": ["G10"], "part": "PHẦN E. LỖI CÚ PHÁP HAY GẶP VÀ QUY TẮC ĐẶT TÊN"}, {"n": 42, "type": "fill", "t": "[Dấu câu trong CREATE TABLE] Điền dấu câu còn thiếu. Chú ý: cột trong FOREIGN KEY phải nằm trong ngoặc.", "f": null, "code": [["CREATE TABLE NGANH ("], ["MaNganh VARCHAR(10) PRIMARY KEY", {"b": 0}], ["TenNganh VARCHAR(100) NOT NULL", {"b": 1}], ["MaKhoa VARCHAR(10) NOT NULL", {"b": 2}], ["CONSTRAINT fk_nganh_khoa"], ["FOREIGN KEY", {"b": 3}, "MaKhoa", {"b": 4}, "REFERENCES KHOA(MaKhoa)"], [")", {"b": 5}]], "bank": [";", ",", "(", ";", ".", ",", ",", ":", ")"], "gs": ["G10"]}, {"n": 43, "type": "mc", "t": "[Nháy đơn và nháy kép] Ràng buộc sau viết trong bảng SINHVIEN. Kết quả khi chạy?", "f": null, "o": ["Lỗi column \"Nam\" does not exist: chuỗi phải đặt trong nháy đơn 'Nam'; nháy kép dùng cho tên định danh", "Chạy đúng, nháy đơn và nháy kép như nhau", "Lỗi vì CHECK không dùng được IN với chuỗi", "Chạy đúng nhưng chỉ nhận chữ thường nam, nữ"], "code": [["CONSTRAINT ck_sv_gioitinh CHECK (GioiTinh IN (\"Nam\", \"Nữ\"))"]], "gs": ["G10"]}, {"n": 44, "type": "mc", "t": "[Kiểu dữ liệu khoá ngoại] KHOA.MaKhoa có kiểu VARCHAR(10). Sinh viên tạo NGANH với MaKhoa INTEGER NOT NULL và khoá ngoại fk_nganh_khoa tham chiếu KHOA(MaKhoa). Kết quả?", "f": null, "o": ["Thành công, PostgreSQL tự đổi kiểu cho khớp", "Thành công nhưng chỉ nhận mã khoa là số", "Lỗi vì cột khoá ngoại không được trùng tên với khoá chính của bảng cha", "Lỗi: khoá ngoại không tạo được vì hai cột có kiểu không tương thích (integer và character varying)"], "gs": ["G4", "G10"]}, {"n": 45, "type": "mc", "t": "[Query Tool · nhiều lệnh] Bôi đen cả hai lệnh sau rồi bấm F5. Kết quả?", "f": null, "o": ["Tạo được cả hai bảng", "Lỗi syntax error at or near \"CREATE\" vì thiếu dấu ; giữa hai lệnh; không bảng nào được tạo", "Tạo được KHOA, lệnh thứ hai báo lỗi", "pgAdmin tự thêm dấu ; nên chạy bình thường"], "code": [["CREATE TABLE KHOA (MaKhoa VARCHAR(10) PRIMARY KEY, TenKhoa VARCHAR(100) NOT NULL UNIQUE)"], ["CREATE TABLE GHICHU (Ma INTEGER PRIMARY KEY)"]], "gs": ["G1", "G10"]}, {"n": 46, "type": "mc", "t": "[Tên in hoa trong Query Tool] Sinh viên gõ trong Query Tool của pgAdmin 4: tên bảng in hoa, tên cột in hoa chữ cái đầu mỗi từ, không dùng ngoặc kép. Nhận định nào đúng?", "f": null, "o": ["Không hợp lệ: PostgreSQL báo lỗi vì tên bảng phải viết thường", "Hợp lệ, tên được lưu nguyên KHOA, MaKhoa nên phải truy vấn SELECT \"MaKhoa\" FROM \"KHOA\"", "Hợp lệ. Tên không có ngoặc kép được chuyển về chữ thường: bảng lưu là khoa, cột là makhoa, tenkhoa; câu SELECT chạy được", "Tạo được bảng nhưng SELECT báo lỗi vì phải gõ đúng hoa thường như lúc tạo"], "code": [["CREATE TABLE KHOA ("], ["MaKhoa VARCHAR(10) PRIMARY KEY,"], ["TenKhoa VARCHAR(100) NOT NULL UNIQUE"], [");"], ["SELECT MaKhoa, TenKhoa FROM KHOA;"]], "gs": ["G10"]}];
+const GROUPS = [{"id": "G1", "name": "Thao tác trên pgAdmin 4", "ref": "Phần A–B của phiếu: tạo database (Databases → Create), tab Definition chọn UTF8, kiểm tra tiêu đề Query Tool, tạo bảng/khoá chính/khoá ngoại trên giao diện, đặt tên chữ thường, đọc tab SQL; Query Tool chạy nhiều lệnh phải có dấu ; ngăn cách"}, {"id": "G2", "name": "Lệnh tạo/xoá đối tượng & đặt tên ràng buộc", "ref": "CREATE DATABASE … TEMPLATE template0; CREATE TABLE; DROP TABLE IF EXISTS (xoá bảng con trước); CONSTRAINT tên CHECK; CREATE VIEW … AS (QT-24)"}, {"id": "G3", "name": "Khoá chính (đơn và ghép)", "ref": "PRIMARY KEY sau cột khi khoá một cột; khoá ghép khai báo một lần ở mức bảng (DIEUKIEN QT-13, DANGKY QT-19)"}, {"id": "G4", "name": "Khoá ngoại, liên kết đệ quy & thứ tự tạo bảng", "ref": "FOREIGN KEY (cột bảng con) REFERENCES bảng_cha(khoá chính); khoá ngoại đặt ở phía nhiều; DIEUKIEN hai khoá ngoại về HOCPHAN; tạo bảng cha trước (QT-02, 04, 06, 13, 20)"}, {"id": "G5", "name": "Hành vi ON DELETE", "ref": "ON DELETE NO ACTION từ chối xoá cha còn con (QT-23); ON DELETE SET NULL đưa khoá ngoại về rỗng (QT-16); CASCADE xoá luôn bảng con"}, {"id": "G6", "name": "NOT NULL / cho phép rỗng & kiểu dữ liệu", "ref": "\"đúng một\" → NOT NULL; tham gia tuỳ chọn → cho phép NULL; DATE cho ngày, INTEGER cho số tín chỉ, DECIMAL(4,2) cho điểm; UNIQUE chống trùng (QT-01, 07, 09, 12, 21)"}, {"id": "G7", "name": "Ràng buộc CHECK (IN, BETWEEN, LIKE, <>)", "ref": "CHECK giới hạn miền giá trị: IN (danh sách), BETWEEN a AND b (gồm hai đầu), LIKE '____-____' (khuôn dạng), <> (khác); NULL vẫn qua CHECK (QT-08, 10, 12, 14, 17, 21)"}, {"id": "G8", "name": "Từ ERD đến lược đồ & khoá ngoại", "ref": "Phần D: liên kết M:N tách thành bảng riêng (DIEUKIEN, DANGKY); 1:N đặt khoá ngoại ở phía nhiều; nhận diện khoá ngoại; 11 khoá ngoại trong 9 bảng; khoá (MaSV, MaLHP) cho phép học lại; QT-33 cần trigger"}, {"id": "G9", "name": "Kiểm thử ràng buộc & toàn vẹn tham chiếu", "ref": "Phần D: CHECK gặp NULL vẫn chấp nhận; INSERT mã chưa có ở bảng cha bị từ chối; DELETE dòng cha còn được tham chiếu bị từ chối (NO ACTION)"}, {"id": "G10", "name": "Lỗi cú pháp & quy tắc đặt tên", "ref": "Phần E: dấu phẩy thừa sau cột cuối, dấu phẩy/ngoặc/dấu ; trong CREATE TABLE, nháy đơn cho chuỗi – nháy kép cho tên, kiểu khoá ngoại phải tương thích, thiếu ; giữa hai lệnh, tên in hoa không ngoặc kép được đổi về chữ thường"}];
+const PACK12 = [];
+const PACK12_RULE = {"min": 0, "need": []};
+const IMG = {};
+/* Đáp án được mã hoá base64 để học sinh không vô tình đọc thấy khi mở mã nguồn.
+   Đây KHÔNG phải bảo mật: người cố ý vẫn giải mã được. */
+const KEY = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob("eyIxIjogeyJrIjogIkEiLCAiZSI6ICJEYXRhYmFzZSBsw6AgduG7jyBjaOG7qWEgY8OhYyBi4bqjbmcgbsOqbiDEkcaw4bujYyB04bqhbyB04burIG3hu6VjIERhdGFiYXNlcyBj4bunYSBzZXJ2ZXIuIFRhYmxlcyBjaOG7iSBjw7Mgc2F1IGtoaSDEkcOjIGPDsyBkYXRhYmFzZSB2w6Agc2NoZW1hLiJ9LCAiMiI6IHsiayI6ICJCIiwgImUiOiAiVGFiIERlZmluaXRpb24gY2jhu6lhIEVuY29kaW5nLCBUZW1wbGF0ZSwgQ29sbGF0aW9uLiBUYWIgR2VuZXJhbCBjaOG7iSBjw7MgdMOqbiB2w6AgY2jhu6cgc+G7nyBo4buvdS4ifSwgIjMiOiB7ImsiOiAiQSIsICJlIjogIlF1ZXJ5IFRvb2wgY2jhuqF5IHRyw6puIGRhdGFiYXNlIMSRYW5nIGNo4buNbiBraGkgbeG7nyBuw7MuIE7hur91IHRpw6p1IMSR4buBIGdoaSBwb3N0Z3Jlcy9wb3N0Z3Jlc0AuLi4gdGjDrCBi4bqjbmcgc+G6vSBi4buLIHThuqFvIG5o4bqnbSB2w6BvIGRhdGFiYXNlIHBvc3RncmVzLiBLaeG7g20gdHJhIHRow6ptIGLhurFuZyBTRUxFQ1QgY3VycmVudF9kYXRhYmFzZSgpOyJ9LCAiNCI6IHsiayI6IFsiQ1JFQVRFIiwgIkRBVEFCQVNFIiwgIlRFTVBMQVRFIl0sICJlIjogIkNSRUFURSBEQVRBQkFTRSB04bqhbyBDU0RMIG3hu5tpLiBURU1QTEFURSB0ZW1wbGF0ZTAgZ2nDunAgY2jhu41uIMSRxrDhu6NjIFVURjgga+G7gyBj4bqjIGtoaSB0ZW1wbGF0ZTEgdHLDqm4gV2luZG93cyBkw7luZyBi4bqjbmcgbcOjIGtow6FjLiJ9LCAiNSI6IHsiayI6ICJCIiwgImUiOiAiQuG6o25nIG7hurFtIHRyb25nIG3hu5l0IHNjaGVtYTsgc2NoZW1hIG3hurdjIMSR4buLbmggbMOgIHB1YmxpYy4gQ2h14buZdCBwaOG6o2kgVGFibGVzIOKGkiBDcmVhdGUg4oaSIFRhYmxlLi4uIn0sICI2IjogeyJrIjogIkIiLCAiZSI6ICJUYWIgQ29sdW1ucyBraGFpIGLDoW8gdOG7q25nIGPhu5l0OiB0w6puLCBraeG7g3UsIE5vdCBOVUxMPywgUHJpbWFyeSBrZXk/LiBwZ0FkbWluIHThu7EgxJHhurd0IHTDqm4gcsOgbmcgYnXhu5ljIGzDoCBraG9hX3BrZXkuIn0sICI3IjogeyJrIjogIkMiLCAiZSI6ICJLaG/DoSBuZ2/huqFpIGzDoCBt4buZdCByw6BuZyBideG7mWMgbeG7qWMgYuG6o25nLiBQaOG6o2kgY2jhu41uIGPhurdwIGPhu5l0IChtYWtob2Eg4oaSIGtob2EubWFraG9hKSBy4buTaSBi4bqlbSBBZGQgxJHhu4MgxJHGsGEgeHXhu5FuZyBkYW5oIHPDoWNoLiJ9LCAiOCI6IHsiayI6ICJCIiwgImUiOiAiVMOqbiBraMO0bmcgY8OzIG5nb+G6t2Mga8OpcCDEkcaw4bujYyBQb3N0Z3JlU1FMIGNodXnhu4NuIHbhu4EgY2jhu68gdGjGsOG7nW5nLiBUw6puIGPDsyBuZ2/hurdjIGvDqXAgZ2nhu68gbmd1ecOqbiBob2EgdGjGsOG7nW5nLCBuw6puIGPDoWMgbOG7h25oIHZp4bq/dCBraMO0bmcgbmdv4bq3YyBrw6lwIHPhur0ga2jDtG5nIGto4bubcC4ifSwgIjkiOiB7ImsiOiAiQiIsICJlIjogIk3hu41pIHRoYW8gdMOhYyB0csOqbiBnaWFvIGRp4buHbiDEkeG7gXUgxJHGsOG7o2MgZOG7i2NoIHRow6BuaCBTUUwuIMSQ4buNYyB0YWIgU1FMIHRyxrDhu5tjIGtoaSBTYXZlIGdpw7pwIMSR4buRaSBjaGnhur91IHbhu5tpIHNjcmlwdCBt4bqrdS4ifSwgIjEwIjogeyJrIjogWyJDUkVBVEUiLCAiVEFCTEUiLCAiS0hPQSIsICJQUklNQVJZIiwgIktFWSJdLCAiZSI6ICJDUkVBVEUgVEFCTEUgdMOqbl9i4bqjbmcgKCAuLi4gKSB04bqhbyBi4bqjbmcuIFBSSU1BUlkgS0VZIHZp4bq/dCBuZ2F5IHNhdSBj4buZdCBraGkga2hvw6EgY2jDrW5oIGNo4buJIGPDsyBt4buZdCBj4buZdC4ifSwgIjExIjogeyJrIjogWyJOT1QiLCAiTlVMTCIsICJVTklRVUUiXSwgImUiOiAiTk9UIE5VTEw6IGLhuq90IGJ14buZYyBjw7MgZ2nDoSB0cuG7iy4gVU5JUVVFOiBraMO0bmcgdHLDuW5nLiBLaMO0bmcgZMO5bmcgUFJJTUFSWSBLRVkgdsOsIG3hu5dpIGLhuqNuZyBjaOG7iSBjw7MgbeG7mXQga2hvw6EgY2jDrW5oIChNYUtob2EpLiIsICJhbHQiOiBbWyJVTklRVUUiLCAiTk9UIiwgIk5VTEwiXV19LCAiMTIiOiB7ImsiOiBbIk5PVCIsICJOVUxMIiwgIkZPUkVJR04iLCAiS0VZIiwgIlJFRkVSRU5DRVMiLCAiS0hPQSJdLCAiZSI6ICJcIsSQw7puZyBt4buZdFwiIG5naMSpYSBsw6AgYuG6r3QgYnXhu5ljIG7Dqm4gTWFLaG9hIE5PVCBOVUxMLiBLaG/DoSBuZ2/huqFpIMSR4bq3dCDhu58gcGjDrWEgXCJuaGnhu4F1XCIgKE5HQU5IKSB2w6AgdHLhu48gduG7gSBi4bqjbmcgcGjDrWEgXCJt4buZdFwiIChLSE9BKS4ifSwgIjEzIjogeyJrIjogWyJPTiIsICJERUxFVEUiLCAiTk8iLCAiQUNUSU9OIl0sICJlIjogIk5PIEFDVElPTiAoY8WpbmcgbMOgIG3hurdjIMSR4buLbmgpIHThu6sgY2jhu5FpIHhvw6Ega2hvYSBjw7JuIGTDsm5nIHRoYW0gY2hp4bq/dS4gQ0FTQ0FERSBz4bq9IHhvw6EgbHXDtG4gY8OhYyBuZ8OgbmgsIHRyw6FpIHbhu5tpIFFULTIzLiJ9LCAiMTQiOiB7ImsiOiBbIk1hTmdhbmgiLCAiTkdBTkgiLCAiTWFOZ2FuaCJdLCAiZSI6ICJUcm9uZyBuZ2/hurdjIHNhdSBGT1JFSUdOIEtFWSBsw6AgY+G7mXQgY+G7p2EgYuG6o25nIMSRYW5nIHThuqFvOyBzYXUgUkVGRVJFTkNFUyBsw6AgYuG6o25nIMSRxrDhu6NjIHRoYW0gY2hp4bq/dSB2w6Aga2hvw6EgY2jDrW5oIGPhu6dhIG7Dsy4ifSwgIjE1IjogeyJrIjogWyJOT1QiLCAiTlVMTCIsICJEQVRFIl0sICJlIjogIk5nw6B5IHNpbmggZMO5bmcga2nhu4N1IERBVEUgxJHhu4Mgc28gc8OhbmgsIHTDrW5oIHR14buVaSDEkcaw4bujYy4gS2jDtG5nIGdoaSBOT1QgTlVMTCBuZ2jEqWEgbMOgIGNobyBwaMOpcCBy4buXbmcsIMSRw7puZyBRVC0wNy4ifSwgIjE2IjogeyJrIjogWyJDSEVDSyIsICJJTiJdLCAiZSI6ICJDSEVDSyBnaeG7m2kgaOG6oW4gbWnhu4FuIGdpw6EgdHLhu4s7IElOIHNvIHbhu5tpIG3hu5l0IGRhbmggc8OhY2guIEdpw6EgdHLhu4sgTlVMTCB24bqrbiBxdWEgxJHGsOG7o2MgQ0hFQ0ssIG7Dqm4gZ2nhu5tpIHTDrW5oIHLhu5duZyB24bqrbiBo4bujcCBs4buHLiJ9LCAiMTciOiB7ImsiOiBbIk5VTEwiLCAiTE9QIl0sICJlIjogIktob8OhIG5nb+G6oWkgY2hvIHBow6lwIHLhu5duZyB0aOG7gyBoaeG7h24gdGhhbSBnaWEgdHXhu7MgY2jhu41uICgwLi4xKS4gVmnhur90IE5VTEwgaGF5IGLhu48gdHLhu5FuZyDEkeG7gXUgY2hvIHBow6lwIHLhu5duZzsgTk9UIE5VTEwgc+G6vSBsw6BtIHNhaSBRVC0wNiB2w6AgbOG7l2kga2hpIG7huqFwIDQgc2luaCB2acOqbiBjaMawYSB44bq/cCBs4bubcC4ifSwgIjE4IjogeyJrIjogWyJOT1QiLCAiTlVMTCIsICJJTiJdLCAiZSI6ICJcIsSQw7puZyBt4buZdCBraG9hXCIgbsOqbiBNYUtob2EgTk9UIE5VTEwuIEhvY1ZpIGNobyBwaMOpcCBy4buXbmcgKEEuNi42LjUpIG5oxrBuZyBu4bq/dSBjw7MgdGjDrCBwaOG6o2kgbuG6sW0gdHJvbmcgZGFuaCBzw6FjaC4ifSwgIjE5IjogeyJrIjogWyJJTlRFR0VSIiwgIkJFVFdFRU4iLCAiQU5EIl0sICJlIjogIkJFVFdFRU4gYSBBTkQgYiBn4buTbSBj4bqjIGhhaSDEkeG6p3UgbcO6dCAxIHbDoCA2LiBLaeG7g3UgSU5URUdFUiDEkeG7gyBzbyBzw6FuaCBz4buRIMSRxrDhu6NjLiJ9LCAiMjAiOiB7ImsiOiBbIlBSSU1BUlkiLCAiS0VZIiwgIk1hSFAiLCAiTWFIUF9UUSJdLCAiZSI6ICJLaG/DoSBjaMOtbmggZ2jDqXAgcGjhuqNpIGtoYWkgYsOhbyBt4buZdCBs4bqnbiDhu58gbeG7qWMgYuG6o25nLiBWaeG6v3QgUFJJTUFSWSBLRVkgc2F1IHThu6tuZyBj4buZdCBz4bq9IGLDoW8gbOG7l2kgXCJtdWx0aXBsZSBwcmltYXJ5IGtleXNcIi4iLCAiYWx0IjogW1siUFJJTUFSWSIsICJLRVkiLCAiTWFIUF9UUSIsICJNYUhQIl1dfSwgIjIxIjogeyJrIjogWyJIT0NQSEFOIiwgIk1hSFBfVFEiLCAiSE9DUEhBTiIsICJNYUhQIl0sICJlIjogIkxpw6puIGvhur90IMSR4buHIHF1eTogY+G6oyBoYWkga2hvw6Egbmdv4bqhaSB0cuG7jyB24buBIGPDuW5nIGLhuqNuZyBIT0NQSEFOLCBj4buZdCBNYUhQLiBIT0NQSEFOIGtow7RuZyBjw7MgY+G7mXQgTWFIUF9UUS4ifSwgIjIyIjogeyJrIjogWyI8PiJdLCAiZSI6ICI8PiBsw6AgdG/DoW4gdOG7rSBcImtow6FjXCIgdHJvbmcgU1FMIGNodeG6qW4gKFBvc3RncmVTUUwgY8Wpbmcgbmjhuq1uICE9KS4gROG6pXUgPSBz4bq9IGNo4buJIGNobyBwaMOpcCB0csaw4budbmcgaOG7o3Agc2FpLiJ9LCAiMjMiOiB7ImsiOiBbIklOIiwgIkxJS0UiXSwgImUiOiAiTeG7l2kgZOG6pXUgXFxfIHRyb25nIExJS0Uga2jhu5twIMSRw7puZyBt4buZdCBrw70gdOG7sS4gTElLRSBjaOG7iSBraeG7g20ga2h1w7RuIGThuqFuZzogJzIwMjUtMjAyNycgduG6q24gxJHGsOG7o2MgY2jhuqVwIG5o4bqtbi4ifSwgIjI0IjogeyJrIjogWyJTRVQiLCAiTlVMTCJdLCAiZSI6ICJTRVQgTlVMTCDEkcawYSBNYUdWIHbhu4EgcuG7l25nOyBj4buZdCBNYUdWIHBo4bqjaSBjaG8gcGjDqXAgcuG7l25nIHRow6wgbeG7m2kgZMO5bmcgxJHGsOG7o2MuIENBU0NBREUgc+G6vSB4b8OhIGx1w7RuIGzhu5twIGjhu41jIHBo4bqnbi4ifSwgIjI1IjogeyJrIjogWyJNYVNWIiwgIk1hTEhQIiwgIlNJTkhWSUVOIiwgIkxPUEhPQ1BIQU4iXSwgImUiOiAiS2hvw6EgY2jDrW5oIGdow6lwIHThu6sgaGFpIGtob8OhIG5nb+G6oWk7IG3hu5dpIHNpbmggdmnDqm4gxJHEg25nIGvDvSBt4buZdCBs4bubcCBo4buNYyBwaOG6p24gbmhp4buBdSBuaOG6pXQgbeG7mXQgbOG6p24uIFNpbmggdmnDqm4gxJHEg25nIGvDvSBs4bubcCBo4buNYyBwaOG6p24sIGtow7RuZyDEkcSDbmcga8O9IHRy4buxYyB0aeG6v3AgaOG7jWMgcGjhuqduLiIsICJhbHQiOiBbWyJNYUxIUCIsICJNYVNWIiwgIlNJTkhWSUVOIiwgIkxPUEhPQ1BIQU4iXV19LCAiMjYiOiB7ImsiOiBbIkRFQ0lNQUwiLCAiQkVUV0VFTiIsICJBTkQiXSwgImUiOiAiREVDSU1BTCg0LDIpIGzGsHUgxJHGsOG7o2MgxJHhur9uIDk5Ljk5IG7Dqm4gY+G6p24gQ0hFQ0sgZ2nhu5tpIGjhuqFuIDDigJMxMC4gS2jDtG5nIGdoaSBOT1QgTlVMTCB2w6wgbMaw4bujdCBjaMawYSBjaOG6pW0gxJHhu4MgdHLhu5FuZy4ifSwgIjI3IjogeyJrIjogWyJLSE9BIiwgIk5HQU5IIiwgIkxPUCIsICJTSU5IVklFTiIsICJEQU5HS1kiXSwgImUiOiAiTkdBTkggdGhhbSBjaGnhur91IEtIT0EsIExPUCB0aGFtIGNoaeG6v3UgTkdBTkgsIFNJTkhWSUVOIHRoYW0gY2hp4bq/dSBMT1AsIERBTkdLWSB0aGFtIGNoaeG6v3UgU0lOSFZJRU4uIFThuqFvIHNhaSB0aOG7qSB04buxIHPhur0gYsOhbyByZWxhdGlvbiAuLi4gZG9lcyBub3QgZXhpc3QuIn0sICIyOCI6IHsiayI6IFsiRFJPUCIsICJUQUJMRSIsICJJRiIsICJFWElTVFMiXSwgImUiOiAiRFJPUCBUQUJMRSB4b8OhIGPhuqMgY+G6pXUgdHLDumMgYuG6o25nOyBERUxFVEUgY2jhu4kgeG/DoSBk4buvIGxp4buHdS4gWG/DoSBuZ8aw4bujYyB0aOG7qSB04buxIHThuqFvOiBi4bqjbmcgY29uIHRyxrDhu5tjLCBi4bqjbmcgY2hhIHNhdS4ifSwgIjI5IjogeyJrIjogWyJDT05TVFJBSU5UIiwgIkNIRUNLIl0sICJlIjogIkNPTlNUUkFJTlQgdMOqbl9yw6BuZ19ideG7mWMgxJHhu6luZyB0csaw4bubYyBsb+G6oWkgcsOgbmcgYnXhu5ljLiBLaGkgdmkgcGjhuqFtLCBQb3N0Z3JlU1FMIGLDoW8gxJHDum5nIHTDqm4gY2tfaHBfc290aW5jaGkuIn0sICIzMCI6IHsiayI6IFsiQ1JFQVRFIiwgIlZJRVciLCAiQVMiXSwgImUiOiAiS2h1bmcgbmjDrG4gbMOgIGPDonUgU0VMRUNUIMSRxrDhu6NjIMSR4bq3dCB0w6puOyBt4buXaSBs4bqnbiB0cnV5IHbhuqVuLCDEkWnhu4NtIHThu5VuZyBr4bq/dCDEkcaw4bujYyB0w61uaCBs4bqhaSB04burIERBTkdLWS4gQ1JFQVRFIFRBQkxFIHPhur0gbMawdSBt4buZdCBi4bqjbiBzYW8gZOG7ryBsaeG7h3UsIHRyw6FpIHbhu5tpIFFULTI0LiJ9LCAiMzEiOiB7ImsiOiAiQiIsICJlIjogIkRJRVVLSUVOIMOhbmggeOG6oSB04burIGxpw6puIGvhur90IMSR4buHIHF1eSBNOk4gXCJ0acOqbiBxdXnhur90XCIgY+G7p2EgSE9DUEhBTjsgREFOR0tZIMOhbmggeOG6oSB04burIGxpw6puIGvhur90IE06TiBnaeG7r2EgU0lOSFZJRU4gdsOgIExPUEhPQ1BIQU4uIE3hu5dpIGxpw6puIGvhur90IE06TiB0w6FjaCB0aMOgbmggbeG7mXQgYuG6o25nIHJpw6puZy4ifSwgIjMyIjogeyJrIjogIkQiLCAiZSI6ICJMacOqbiBr4bq/dCBNOk4ga2jDtG5nIGJp4buDdSBkaeG7hW4gxJHGsOG7o2MgYuG6sW5nIG3hu5l0IGtob8OhIG5nb+G6oWkuIELhuqNuZyBEQU5HS1kgZ2nhu68gbeG7l2kgY+G6t3AgKHNpbmggdmnDqm4sIGzhu5twIGjhu41jIHBo4bqnbikgbeG7mXQgZMOybmcsIGvDqG0gdGh14buZYyB0w61uaCBj4bunYSBsacOqbiBr4bq/dCBsw6AgRGllbVF1YVRyaW5oLCBEaWVtVGhpLiJ9LCAiMzMiOiB7ImsiOiAiQSIsICJlIjogIk1hSFAg4oaSIEhPQ1BIQU4gKGLhuq90IGJ14buZYywgUVQtMTUpOyBNYUdWIOKGkiBHSUFOR1ZJRU4gKGNobyBwaMOpcCBy4buXbmcsIFFULTE2KS4gTWFMSFAgbMOgIGtob8OhIGNow61uaDsgSG9jS3ksIE5hbUhvYyBsw6AgdGh14buZYyB0w61uaCB0aMaw4budbmcgY8OzIENIRUNLLiJ9LCAiMzQiOiB7ImsiOiAiQyIsICJlIjogIkxpw6puIGvhur90IDE6Tjoga2hvw6Egbmdv4bqhaSDEkeG6t3Qg4bufIHBow61hIG5oaeG7gXUuIFwixJDDum5nIG3hu5l0XCIgKHRoYW0gZ2lhIGLhuq90IGJ14buZYykgbsOqbiBNYUhQIE5PVCBOVUxMLiDEkOG6t3QgTWFMSFAgdHJvbmcgSE9DUEhBTiB0aMOsIG3hu5l0IGTDsm5nIHBo4bqjaSBjaOG7qWEgbmhp4buBdSBtw6MgbOG7m3AuIn0sICIzNSI6IHsiayI6ICJCIiwgImUiOiAiTkdBTkggMSwgR0lBTkdWSUVOIDEsIEhPQ1BIQU4gMSwgTE9QIDEsIFNJTkhWSUVOIDEsIExPUEhPQ1BIQU4gMiwgRElFVUtJRU4gMiwgREFOR0tZIDIgPSAxMS4gS0hPQSDhu58gdOG6p25nIDEsIGtow7RuZyB0aGFtIGNoaeG6v3UgYuG6o25nIG7DoG8sIG7Dqm4gdOG6oW8gxJHhuqd1IHRpw6puLiJ9LCAiMzYiOiB7ImsiOiAiQyIsICJlIjogIktob8OhIGNow61uaCBjaOG7iSBj4bqlbSB0csO5bmcgY+G6oyBj4bq3cC4gROG7ryBsaeG7h3UgbeG6q3UgY8OzIDk0IGPhurdwIGjhu41jIGzhuqFpIG5oxrAgduG6rXkuIE7hur91IGNo4buNbiBraG/DoSAoTWFTViwgTWFIUCkgdGjDrCBraMO0bmcgbMawdSDEkcaw4bujYyBs4bqnbiBo4buNYyBs4bqhaS4ifSwgIjM3IjogeyJrIjogIkQiLCAiZSI6ICJVTklRVUUgdsOgIENIRUNLIGNo4buJIGzDoG0gdmnhu4djIHRyw6puIGPhu5l0IGPhu6dhIGNow61uaCBi4bqjbmcuIEtob8OhIGNow61uaCAoTWFTViwgTWFMSFApIGtow7RuZyBjaOG6t24gxJHGsOG7o2MgaGFpIGzhu5twIGtow6FjIG5oYXUgY+G7p2EgY8O5bmcgaOG7jWMgcGjhuqduLCBuw6puIGPhuqduIHRyaWdnZXIgdHJnX2RhbmdreV9xdDMzLiJ9LCAiMzgiOiB7ImsiOiAiQSIsICJlIjogIkNIRUNLIGfhurdwIE5VTEwgY2hvIGvhur90IHF14bqjIFVOS05PV04gbsOqbiB24bqrbiDEkcaw4bujYyBjaOG6pXAgbmjhuq1uIChsxrDhu6N0IGNoxrBhIGNo4bqlbSkuIDEwLjUgduG7q2Ega2nhu4N1IERFQ0lNQUwoNCwyKSBuaMawbmcgdmkgcGjhuqFtIEJFVFdFRU4gMCBBTkQgMTAuIn0sICIzOSI6IHsiayI6ICJCIiwgImUiOiAiS2hvw6Egbmdv4bqhaSBi4bqjbyDEkeG6o20gbeG7jWkgTWFMSFAgdHJvbmcgREFOR0tZIHBo4bqjaSBjw7MgdHJvbmcgTE9QSE9DUEhBTi4gTXXhu5FuIMSRxINuZyBrw70gcGjhuqNpIHThuqFvIGzhu5twIGjhu41jIHBo4bqnbiB0csaw4bubYy4ifSwgIjQwIjogeyJrIjogIkQiLCAiZSI6ICJLaMO0bmcgZ2hpIE9OIERFTEVURSBuZ2jEqWEgbMOgIE5PIEFDVElPTi4gUGjhuqNpIHhvw6EgY8OhYyBkw7JuZyBEQU5HS1kgY+G7p2EgU1YxIHRyxrDhu5tjLiBTRVQgTlVMTCBjxaluZyBraMO0bmcgdGjhu4MgdsOsIE1hU1YgbuG6sW0gdHJvbmcga2hvw6EgY2jDrW5oLiJ9LCAiNDEiOiB7ImsiOiAiQyIsICJlIjogIkThuqV1IHBo4bqpeSBkw7luZyDEkeG7gyBuZ8SDbiBjw6FjaCBjw6FjIGPhu5l0IHbDoCByw6BuZyBideG7mWMsIG7Dqm4gc2F1IHBo4bqnbiB04butIGN14buRaSBjw7luZyBraMO0bmcgY8OzIGThuqV1IHBo4bqpeS4gTOG7l2kgaGF5IGfhurdwIGtoaSB4b8OhIGLhu5t0IGTDsm5nIGN14buRaS4ifSwgIjQyIjogeyJrIjogWyIsIiwgIiwiLCAiLCIsICIoIiwgIikiLCAiOyJdLCAiZSI6ICJUaGnhur91IGThuqV1IHBo4bqpeSBnaeG7r2EgaGFpIGPhu5l0IGhv4bq3YyB2aeG6v3QgRk9SRUlHTiBLRVkgTWFLaG9hIGtow7RuZyBjw7Mgbmdv4bq3YyDEkeG7gXUgYsOhbyBzeW50YXggZXJyb3IuIEThuqV1IDsga+G6v3QgdGjDumMgbOG7h25oLiJ9LCAiNDMiOiB7ImsiOiAiQSIsICJlIjogIlRyb25nIFNRTCwgJ3bEg24gYuG6o24nIGzDoCBo4bqxbmcgY2h14buXaSwgY8OybiBcIlTDqm5cIiBsw6AgdMOqbiBi4bqjbmcgaG/hurdjIGPhu5l0LiBQb3N0Z3JlU1FMIGhp4buDdSBcIk5hbVwiIGzDoCBt4buZdCBj4buZdCBuw6puIGLDoW8ga2jDtG5nIHThu5NuIHThuqFpLiJ9LCAiNDQiOiB7ImsiOiAiRCIsICJlIjogIkPhu5l0IGtob8OhIG5nb+G6oWkgcGjhuqNpIGPDuW5nIGtp4buDdSAoaG/hurdjIGtp4buDdSBzbyBzw6FuaCDEkcaw4bujYykgduG7m2kgY+G7mXQgxJHGsOG7o2MgdGhhbSBjaGnhur91LiBUw6puIGPhu5l0IHRyw7luZyBuaGF1IGzDoCBiw6xuaCB0aMaw4budbmcsIG5oxrAgTWFLaG9hIOG7nyBj4bqjIGhhaSBi4bqjbmcuIn0sICI0NSI6IHsiayI6ICJCIiwgImUiOiAiS2jDtG5nIGPDsyBk4bqldSA7IHRow6wgaGFpIGzhu4duaCBi4buLIMSR4buNYyBuaMawIG3hu5l0IGzhu4duaCBkw6BpIHbDoCBo4buPbmcgY8O6IHBow6FwIG5nYXkgdOG7qyBjaOG7ryBDUkVBVEUgdGjhu6kgaGFpLiBM4buXaSBjw7ogcGjDoXAgeOG6o3kgcmEgdHLGsOG7m2Mga2hpIGNo4bqheSBuw6puIEtIT0EgY8Wpbmcga2jDtG5nIMSRxrDhu6NjIHThuqFvLiJ9LCAiNDYiOiB7ImsiOiAiQyIsICJlIjogIlTDqm4ga2jDtG5nIG5nb+G6t2Mga8OpcCBraMO0bmcgcGjDom4gYmnhu4d0IGhvYSB0aMaw4budbmcsIE9iamVjdCBFeHBsb3JlciBoaeG7h24ga2hvYSwgbWFraG9hLiBOZ8aw4bujYyBs4bqhaSwgU0VMRUNUIFwiTWFLaG9hXCIgRlJPTSBcIktIT0FcIiBz4bq9IGLDoW8gZG9lcyBub3QgZXhpc3QuIEtow6FjIGPDonUgODogdOG6oW8gYuG6sW5nIGdpYW8gZGnhu4duIHRow6wgcGdBZG1pbiB04buxIHRow6ptIG5nb+G6t2Mga8OpcC4ifX0="), c => c.charCodeAt(0))));
+const LET = ["A","B","C","D"];
+const QMAP = {}; Q.forEach(q => QMAP[q.n] = q);
+const GMAP = {}; GROUPS.forEach(g => GMAP[g.id] = g);
+
+/* ====== LƯU TRỮ AN TOÀN ====== */
+const LS = {
+  get(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } },
+  set(k,v){ try{ localStorage.setItem(k,v); }catch(e){} },
+  del(k){ try{ localStorage.removeItem(k); }catch(e){} }
+};
+const STORE = CFG.store + "_state_v1", KEYSTORE = "quiz_gemini_key", MODELSTORE = "quiz_gemini_model";
+let SAVE_ENABLED = true;
+
+/* ====== TRẠNG THÁI ====== */
+let state = { mode:"full", answers:{}, graded:false, result:null, info:{hoTen:"",maSV:"",lop:""}, ai:null };
+function loadState(){
+  const raw = LS.get(STORE); if(!raw) return;
+  try{ const s = JSON.parse(raw); if(s && typeof s === "object") state = Object.assign(state, s); }catch(e){}
+}
+function saveState(){ if(SAVE_ENABLED) LS.set(STORE, JSON.stringify(state)); }
+function idsFor(mode){ return mode === "p12" ? PACK12.slice() : Q.map(q => q.n); }
+/* ====== CÂU ĐIỀN MÃ ====== */
+function isFill(n){ return QMAP[n].type === "fill"; }
+function nBlank(n){ return isFill(n) ? KEY[n].k.length : 0; }
+function ansDone(n, a){ if(a === undefined) a = state.answers[n]; if(!isFill(n)) return !!a; return Array.isArray(a) && a.length === nBlank(n) && a.every(x => x !== null && x !== undefined); }
+function ansWords(n, a){ return Array.from({length: nBlank(n)}, (_, i) => (a && a[i] != null) ? QMAP[n].bank[a[i]] : null); }
+function isRight(n, a){
+  const k = KEY[n].k;
+  if(!isFill(n)) return a != null && a === k;
+  if(!ansDone(n, a)) return false;
+  const w = ansWords(n, a).join("\u0001");
+  return [k].concat(KEY[n].alt || []).some(x => x.join("\u0001") === w);
+}
+function keyText(n){ return isFill(n) ? KEY[n].k.map((w, i) => `(${i + 1}) ${w}`).join("  ") : KEY[n].k; }
+function ansText(n, a){ if(!isFill(n)) return a || ""; return ansWords(n, a).map((w, i) => `(${i + 1}) ${w == null ? "…" : w}`).join("  "); }
+function shortAns(n, a){ if(!isFill(n)) return a || "-"; return ansDone(n, a) ? ansWords(n, a).join("/") : (a && a.some(x => x != null) ? ansWords(n, a).map(w => w || "…").join("/") : "-"); }
+/* đáp án đúng dưới dạng chỉ số thẻ (dùng cho tự kiểm tra) */
+function rightAns(n){
+  if(!isFill(n)) return KEY[n].k;
+  const used = new Set();
+  return KEY[n].k.map(w => { const i = QMAP[n].bank.findIndex((x, j) => x === w && !used.has(j)); used.add(i); return i; });
+}
+function wrongAns(n){
+  const L = ["A","B","C","D"];
+  if(!isFill(n)) return L[(L.indexOf(KEY[n].k) + 1) % 4];
+  const r = rightAns(n), bank = QMAP[n].bank;
+  const spare = bank.findIndex((w, j) => !r.includes(j) && w !== KEY[n].k[0]);
+  let a = r.slice();
+  if(spare >= 0) a[0] = spare; else a = r.slice(1).concat(r[0]);
+  return isRight(n, a) ? null : a;
+}
+
+/* ====== CHẤM ĐIỂM (hàm thuần, chạy offline) ====== */
+function grade(answers, ids){
+  const per = []; let correct = 0;
+  const groups = {};
+  ids.forEach(n => {
+    const chosen = answers[n] || null;
+    const ok = isRight(n, chosen);
+    if(ok) correct++;
+    QMAP[n].gs.forEach(g => {            // một câu có thể thuộc nhiều nhóm
+      if(!groups[g]) groups[g] = {total:0, correct:0, qs:[]};
+      groups[g].total++; if(ok) groups[g].correct++; groups[g].qs.push(n);
+    });
+    per.push({n, chosen, key:KEY[n].k, ok});
+  });
+  const total = ids.length;
+  const score = total ? correct * 10 / total : 0;
+  let pass = null;
+  if(PACK12.length && ids.length === PACK12.length && ids.every((n,i) => n === PACK12[i])){
+    const okSet = new Set(per.filter(p => p.ok).map(p => p.n));
+    const missing = PACK12_RULE.need.filter(r => !r.q.some(n => okSet.has(n))).map(r => r.name);
+    pass = { ok: correct >= PACK12_RULE.min && missing.length === 0, missing };
+  }
+  return { per, correct, total, score, groups, pass };
+}
+function fmtScore(x){ const r = Math.round(x * 100) / 100; return r.toLocaleString("vi-VN", {maximumFractionDigits:2}); }
+
+/* ====== DỰNG GIAO DIỆN ====== */
+const $ = s => document.querySelector(s);
+function esc(s){ return String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+function rich(s){ return esc(s).replace(/\*\*(.+?)\*\*/g, (m, t) => "<b>" + t + "</b>"); }
+
+const SMALL = new Set(CFG.small || []);
+function figHTML(id, alt){
+  if(!id || !IMG[id]) return "";
+  const small = SMALL.has(id);
+  // Hình rộng giữ tối thiểu FIG_SCALE kích thước gốc để chữ trong hình đọc được trên điện thoại;
+  // khi màn hình hẹp hơn, hình vuốt ngang bên trong khung (trang không bị cuộn ngang).
+  const w = (CFG.imgw || {})[id], mw = w ? Math.round(w * FIG_SCALE) : 0;
+  return `<div class="fig${small ? " small" : ""}" data-img="${id}" role="button" tabindex="0" aria-label="Phóng to hình"><div class="figscroll"><img src="${IMG[id]}" alt="${esc(alt)}" decoding="async"${mw ? ` style="min-width:${mw}px"` : ""}></div><p class="hint">← Vuốt ngang để xem hết hình →</p><span class="zoom" aria-hidden="true">⤢</span></div>`;
+}
+const FIG_SCALE = 0.42;
+function markWide(){ document.querySelectorAll(".fig").forEach(f => { const sc = f.querySelector(".figscroll"); f.classList.toggle("wide", !!sc && sc.scrollWidth > sc.clientWidth + 2); }); }
+window.addEventListener("resize", markWide); window.addEventListener("load", markWide);
+
+function renderQuestions(){
+  const ids = idsFor(state.mode);
+  const box = $("#qs"); box.innerHTML = "";
+  ids.forEach((n, idx) => {
+    const q = QMAP[n];
+    if(q.part && state.mode !== "p12"){ const h = document.createElement("h2"); h.className = "part"; h.textContent = q.part; box.appendChild(h); }
+    const sec = document.createElement("section");
+    sec.className = "card q"; sec.id = "q" + n;
+    sec.innerHTML =
+      `<span class="gtag">${q.gs.map(g => esc(GMAP[g].name)).join(" · ")}</span>
+       <p class="stem"><span class="num">Câu ${n}.</span> ${rich(q.t)}<span class="rtag"></span></p>
+       ${q.f ? figHTML(q.f, "Hình câu " + n) : ""}
+       ${q.type === "fill" ? fillHTML(q) : codeHTML(q) + `<div class="opts" role="radiogroup" aria-label="Phương án câu ${n}">
+         ${q.o.map((o,i) => `<label class="opt" data-l="${LET[i]}"><input type="radio" name="a${n}" value="${LET[i]}"><span class="L">${LET[i]}</span><span class="tx">${esc(o)}</span></label>`).join("")}
+       </div>`}
+       <div class="fbw"></div>`;
+    box.appendChild(sec);
+    const a = state.answers[n];
+    if(q.type === "fill") syncFill(n);
+    else if(a){ const r = sec.querySelector(`input[value="${a}"]`); if(r){ r.checked = true; r.closest(".opt").classList.add("sel"); } }
+  });
+  updateProgress();
+  if(state.graded && state.result) showGraded(state.result);
+  markWide();
+}
+
+function codeHTML(q){ return q.code ? `<div class="code" role="group" aria-label="Đoạn lệnh câu ${q.n}">${q.code.map(l => `<div class="cl">${esc(l.join(" "))}</div>`).join("")}</div>` : ""; }
+function fillHTML(q){
+  const code = q.code.map(line => `<div class="cl">${line.map(seg => typeof seg === "string" ? esc(seg) + " " : `<select class="blank" data-b="${seg.b}" aria-label="Ô (${seg.b + 1}) câu ${q.n}"><option value="">(${seg.b + 1}) ……</option>${q.bank.map((w, i) => `<option value="${i}">${esc(w)}</option>`).join("")}</select> `).join("")}</div>`).join("");
+  return `<div class="code" role="group" aria-label="Đoạn mã câu ${q.n}">${code}</div>
+    <p class="note bankhint">Từ khoá — chạm một ô trống rồi chạm thẻ (hoặc chọn ngay trong ô). Mỗi thẻ dùng tối đa một lần; có cả từ nhiễu. Chạm lại thẻ đã dùng để gỡ ra.</p>
+    <div class="bank">${q.bank.map((w, i) => `<button type="button" class="chip" data-i="${i}">${esc(w)}</button>`).join("")}</div>`;
+}
+const ACTIVE = {};
+function syncFill(n){
+  const sec = document.getElementById("q" + n); if(!sec) return;
+  const a = state.answers[n] || [];
+  sec.querySelectorAll("select.blank").forEach(sel => {
+    const b = +sel.dataset.b, v = a[b];
+    sel.value = v == null ? "" : String(v);
+    sel.classList.toggle("filled", v != null);
+    sel.classList.toggle("act", !state.graded && ACTIVE[n] === b);
+    [...sel.options].forEach(o => { if(o.value !== "") o.disabled = a.some((x, j) => j !== b && x === +o.value); });
+  });
+  sec.querySelectorAll(".chip").forEach(c => c.classList.toggle("used", a.includes(+c.dataset.i)));
+}
+function setBlank(n, b, v){
+  if(state.graded) return;
+  const a = (state.answers[n] || []).slice(); while(a.length < nBlank(n)) a.push(null);
+  if(v != null){ const j = a.indexOf(v); if(j >= 0 && j !== b) a[j] = null; }
+  a[b] = v; state.answers[n] = a;
+  const nxt = a.findIndex(x => x == null); ACTIVE[n] = nxt >= 0 ? nxt : undefined;
+  saveState(); syncFill(n); updateProgress();
+}
+
+function updateProgress(){
+  const ids = idsFor(state.mode);
+  const done = ids.filter(n => ansDone(n)).length;
+  $("#progTxt").textContent = state.graded ? `Đã chấm: ${state.result.correct}/${state.result.total} câu đúng` : `Đã làm ${done}/${ids.length}`;
+  $("#progFill").style.width = (done / ids.length * 100) + "%";
+  $("#topSubmit").textContent = state.graded ? "Xem kết quả" : "Nộp bài";
+}
+
+/* ====== NỘP BÀI ====== */
+let warnedOnce = false;
+function submit(force){
+  if(state.graded){ $("#resultCard").scrollIntoView({behavior:"smooth"}); return; }
+  const ids = idsFor(state.mode);
+  const missing = ids.filter(n => !ansDone(n));
+  if(missing.length && !force && !warnedOnce){
+    warnedOnce = true;
+    const w = $("#submitWarn");
+    w.innerHTML = `Còn ${missing.length} câu chưa chọn: ${missing.map(n => `<a href="#q${n}">Câu ${n}</a>`).join(", ")}. Câu bỏ trống (hoặc câu điền mã còn ô trống) tính là sai. Bấm <b>Nộp bài</b> lần nữa để nộp luôn.`;
+    w.classList.remove("hidden");
+    w.scrollIntoView({behavior:"smooth", block:"center"});
+    return;
+  }
+  const res = grade(state.answers, ids);
+  state.graded = true; state.result = res; state.ai = null;
+  saveState();
+  showGraded(res);
+  $("#submitWarn").classList.add("hidden");
+  $("#resultCard").scrollIntoView({behavior:"smooth"});
+}
+
+function showGraded(res){
+  document.body.classList.add("graded");
+  document.querySelectorAll("#qs input").forEach(i => i.disabled = true);
+  res.per.forEach(p => {
+    const sec = document.getElementById("q" + p.n); if(!sec) return;
+    sec.classList.add(p.ok ? "r-ok" : "r-bad");
+    const blank = isFill(p.n) ? !(p.chosen && p.chosen.some(x => x != null)) : !p.chosen;
+    sec.querySelector(".rtag").innerHTML = p.ok ? `<span class="tag ok">✓ Đúng</span>` : (!blank ? `<span class="tag bad">✗ Sai</span>` : `<span class="tag skip">○ Bỏ trống</span>`);
+    if(isFill(p.n)){
+      syncFill(p.n);
+      const w = ansWords(p.n, p.chosen), alts = [KEY[p.n].k].concat(KEY[p.n].alt || []);
+      const best = alts.reduce((m, x) => x.filter((y, i) => y === w[i]).length > m.filter((y, i) => y === w[i]).length ? x : m, alts[0]);
+      sec.querySelectorAll("select.blank").forEach(sel => { const b = +sel.dataset.b; sel.classList.add(w[b] != null && w[b] === best[b] ? "ok" : "bad"); });
+    }
+    sec.querySelectorAll(".opt").forEach(o => {
+      o.classList.remove("sel");
+      if(o.dataset.l === p.key && !p.ok) o.classList.add("isKey");
+      if(o.dataset.l === p.key && p.ok) o.classList.add("isKey");
+      if(o.dataset.l === p.chosen && !p.ok) o.classList.add("isWrong");
+    });
+    if(!p.ok){
+      const k = KEY[p.n];
+      const af = k.af ? figHTML(k.af, "Hình đáp án câu " + p.n) + `<p class="cap">Hình đáp án: ${esc(k.afc)}</p>` : "";
+      const fill = isFill(p.n);
+      const said = fill ? (blank ? "Em chưa điền. " : `Em điền: <span class="kcode">${esc(ansText(p.n, p.chosen))}</span>.<br>`) : (p.chosen ? `Em chọn <b>${p.chosen}</b>. ` : "Em bỏ trống. ");
+      const alt = fill && KEY[p.n].alt ? `<br><span class="note">Cũng chấm đúng: ${KEY[p.n].alt.map(x => `<span class="kcode">${esc(x.join(" · "))}</span>`).join("; ")}</span>` : "";
+      sec.querySelector(".fbw").innerHTML =
+        `<div class="fb"><p style="margin:0 0 6px">${said}Đáp án đúng: <b class="k${fill ? " kcode" : ""}">${esc(keyText(p.n))}</b>${alt}</p>
+         <p style="margin:0">${esc(k.e)}</p>${af}
+         <p class="cap">Ôn lại: ${esc(k.on || QMAP[p.n].gs.map(g => GMAP[g].ref).join("; "))}</p></div>`;
+    }
+  });
+  renderResult(res);
+  updateProgress(); markWide();
+  $("#submitBox").classList.add("hidden");
+  $("#aiResult").classList.remove("hidden"); updateAIState();
+  $("#aiHint").textContent = res.correct === res.total ? "Em đúng hết. AI vẫn có thể gợi ý bài nâng cao cho tuần tới." : `AI sẽ giải thích ${res.total - res.correct} câu sai và gợi ý việc luyện tuần tới.`;
+  if(state.ai) renderAI(state.ai);
+}
+
+function renderResult(res){
+  const box = $("#resultCard");
+  const gids = GROUPS.map(g => g.id).filter(id => res.groups[id]);
+  const bars = gids.map(id => {
+    const g = res.groups[id], pct = Math.round(g.correct / g.total * 100);
+    return `<div class="bar" title="${esc(GMAP[id].name)}: ${g.correct}/${g.total} câu đúng (${pct}%)">
+      <div class="lab"><span>${esc(GMAP[id].name)}${pct < 50 ? `<span class="need">· cần ôn</span>` : ""}</span><span>${g.correct}/${g.total} · ${pct}%</span></div>
+      <div class="tr" role="img" aria-label="${esc(GMAP[id].name)} ${pct} phần trăm"><div class="fi" style="width:${pct}%"></div><div class="tick"></div></div></div>`;
+  }).join("");
+  const wrong = res.per.filter(p => !p.ok);
+  const P = PACK12.length;
+  const passHTML = res.pass ? (res.pass.ok ? `<span class="pass y">✓ Đạt tiêu chí gói ${P} câu</span>`
+      : `<span class="pass n">✗ Chưa đạt tiêu chí gói ${P} câu</span><p class="note" style="margin:6px 0 0">Cần ≥ ${PACK12_RULE.min}/${P} câu đúng${PACK12_RULE.need.length ? " và đúng ít nhất một câu ở mỗi nhóm " + PACK12_RULE.need.map(r => r.name).join(", ") : ""}${res.pass.missing.length ? "; còn thiếu: " + res.pass.missing.join(", ") : ""}.</p>`) : "";
+  const info = state.info;
+  box.innerHTML = `
+    <h2>Kết quả</h2>
+    ${(info.hoTen || info.maSV || info.lop) ? `<p class="note" style="margin:0 0 8px">${esc([info.hoTen, info.maSV, info.lop].filter(Boolean).join(" · "))}</p>` : ""}
+    <div class="score"><span class="big" id="scoreVal">${fmtScore(res.score)}</span><span class="of">/ 10 điểm</span>
+      <span class="of" id="scoreCount">· ${res.correct}/${res.total} câu đúng</span></div>
+    ${passHTML}
+    <h3 style="margin-top:18px">Kết quả theo ${esc(CFG.groups_label)}</h3>
+    <div class="chart" id="chart">${bars}</div>
+    <p class="legend">Thanh cho biết tỉ lệ câu đúng trong từng nhóm. ${CFG.multi_group ? "Một câu có thể thuộc nhiều nhóm nên được tính ở mọi nhóm đó. " : ""}Vạch mờ đánh dấu mốc 70%; nhóm dưới 50% được ghi “cần ôn”.</p>
+    ${wrong.length ? `<h3 style="margin-top:14px">Câu cần xem lại (${wrong.length})</h3>
+      <div class="wrong-list">${wrong.map(p => `<div><a href="#q${p.n}">Câu ${p.n}</a> — ${isFill(p.n) ? `em điền ${esc(shortAns(p.n, p.chosen))}, đúng là <b class="kcode">${esc(KEY[p.n].k.join("/"))}</b>` : `${p.chosen ? `em chọn ${p.chosen}` : "em bỏ trống"}, đáp án đúng <b>${p.key}</b>`}</div>`).join("")}</div>`
+      : `<p class="okmsg">Em trả lời đúng tất cả các câu. Rất tốt!</p>`}
+    <div class="row noprint" style="margin-top:16px">
+      <button type="button" id="copyRes">Sao chép kết quả</button>
+      <button type="button" id="printRes">In / lưu PDF</button>
+      <button type="button" id="redo">Làm lại từ đầu</button>
+    </div>
+    <div id="copyMsg"></div>`;
+  box.classList.remove("hidden");
+  $("#copyRes").onclick = copyResult;
+  $("#printRes").onclick = () => window.print();
+  $("#redo").onclick = resetAll;
+}
+
+function resultText(){
+  const r = state.result, i = state.info;
+  const lines = [
+    "KẾT QUẢ: " + CFG.result_title,
+    `Họ tên: ${i.hoTen || "-"} | Mã SV: ${i.maSV || "-"} | Lớp: ${i.lop || "-"}`,
+    `Bộ câu: ${modeLabel(state.mode)}`,
+    `Điểm: ${fmtScore(r.score)}/10 (${r.correct}/${r.total} câu đúng)` + (r.pass ? ` — ${r.pass.ok ? "ĐẠT" : "CHƯA ĐẠT"}` : ""),
+    "Theo " + CFG.groups_label + ": " + GROUPS.filter(g => r.groups[g.id]).map(g => `${g.name} ${r.groups[g.id].correct}/${r.groups[g.id].total}`).join("; "),
+    "Bài làm: " + r.per.map(p => isFill(p.n) ? `${p.n}[${shortAns(p.n, p.chosen)}]${p.ok ? "" : "✗"}` : `${p.n}${p.chosen || "-"}${p.ok ? "" : "✗"}`).join(" "),
+    "Thời điểm nộp: " + new Date().toLocaleString("vi-VN")
+  ];
+  return lines.join("\n");
+}
+async function copyResult(){
+  const t = resultText(); let ok = false;
+  try{ await navigator.clipboard.writeText(t); ok = true; }catch(e){
+    try{ const ta = document.createElement("textarea"); ta.value = t; document.body.appendChild(ta); ta.select(); ok = document.execCommand("copy"); ta.remove(); }catch(e2){}
+  }
+  $("#copyMsg").innerHTML = ok ? `<p class="okmsg">Đã sao chép. Dán vào tin nhắn/biểu mẫu để gửi giảng viên.</p>` : `<pre class="mono">${esc(t)}</pre>`;
+}
+
+function resetAll(){
+  state.answers = {}; state.graded = false; state.result = null; state.ai = null; warnedOnce = false;
+  saveState();
+  document.body.classList.remove("graded");
+  $("#resultCard").classList.add("hidden"); $("#resultCard").innerHTML = "";
+  $("#submitBox").classList.remove("hidden"); $("#submitWarn").classList.add("hidden");
+  $("#aiOut").innerHTML = ""; $("#aiResult").classList.add("hidden");
+  clearKey(); // máy dùng chung: không để key sang lượt làm bài sau
+  renderQuestions();
+  window.scrollTo({top:0, behavior:"smooth"});
+}
+
+/* ====== SỰ KIỆN ====== */
+$("#qs").addEventListener("change", e => {
+  const t = e.target;
+  if(t.matches && t.matches("select.blank")){ const n = +t.closest(".q").id.slice(1); setBlank(n, +t.dataset.b, t.value === "" ? null : +t.value); return; }
+  if(!t.name || !t.name.startsWith("a") || state.graded) return;
+  state.answers[+t.name.slice(1)] = t.value; saveState(); updateProgress();
+  t.closest(".opts").querySelectorAll(".opt").forEach(o => o.classList.toggle("sel", o.contains(t)));
+});
+$("#qs").addEventListener("focusin", e => { const t = e.target; if(t.matches && t.matches("select.blank") && !state.graded){ const n = +t.closest(".q").id.slice(1); ACTIVE[n] = +t.dataset.b; syncFill(n); } });
+$("#qs").addEventListener("click", e => {
+  const c = e.target.closest && e.target.closest(".chip"); if(!c || state.graded) return;
+  const n = +c.closest(".q").id.slice(1), i = +c.dataset.i, a = state.answers[n] || [];
+  const at = a.indexOf(i);
+  if(at >= 0){ setBlank(n, at, null); ACTIVE[n] = at; syncFill(n); return; }   // chạm thẻ đã dùng: gỡ ra
+  let b = ACTIVE[n];
+  if(b == null || a[b] != null){ b = Array.from({length: nBlank(n)}, (_, j) => j).find(j => a[j] == null); }
+  if(b == null) b = ACTIVE[n] != null ? ACTIVE[n] : nBlank(n) - 1;
+  setBlank(n, b, i);
+});
+$("#submitBtn").onclick = () => submit(false);
+$("#topSubmit").onclick = () => submit(false);
+function modeLabel(mode){ return mode === "p12" ? `gói ${PACK12.length} câu` : `đủ ${Q.length} câu`; }
+function renderModes(){
+  if(!PACK12.length) return;
+  const seg = $("#modeSeg");
+  seg.innerHTML = `<label><input type="radio" name="mode" value="full"><span><b>Đủ ${Q.length} câu</b><small>${esc(CFG.full_time || "")}</small></span></label>
+    <label><input type="radio" name="mode" value="p12"><span><b>${esc(CFG.pack_label || "Gói rút gọn")}</b><small>${esc(CFG.pack_time || "")}</small></span></label>`;
+  seg.classList.remove("hidden");
+  seg.querySelectorAll('input[name="mode"]').forEach(r => r.addEventListener("change", () => {
+    if(state.graded){ state.mode = r.value; resetAll(); return; }   // đổi bộ câu sau khi nộp => làm lại
+    state.mode = r.value; warnedOnce = false; saveState(); renderQuestions();
+  }));
+}
+function setModeRadio(){ const r = document.querySelector(`input[name="mode"][value="${state.mode}"]`); if(r) r.checked = true; }
+function renderLegend(){
+  if(!CFG.legend_html) return;
+  const box = $("#legendCard");
+  box.innerHTML = CFG.legend_html.replace(/\{\{IMG:(\d+)(?:\|([^}]*))?\}\}/g, (m, id, alt) => figHTML(+id, alt || "Hình quy ước"));
+  box.classList.remove("hidden"); markWide();
+}
+["hoTen","maSV","lop"].forEach(id => $("#" + id).addEventListener("input", e => { state.info[id] = e.target.value.trim(); saveState(); }));
+
+/* phóng to hình */
+function openLB(id){
+  const im = $("#lbImg"); im.src = IMG[id];
+  im.style.width = Math.max(window.innerWidth * (window.innerWidth < 700 ? 1.8 : 1), 300) + "px";
+  $("#lb").classList.remove("hidden"); document.body.style.overflow = "hidden"; $("#lbClose").focus();
+}
+function closeLB(){ $("#lb").classList.add("hidden"); document.body.style.overflow = ""; }
+let swipeX = null;
+document.addEventListener("pointerdown", e => { swipeX = e.clientX; }, true);
+document.addEventListener("click", e => { const f = e.target.closest(".fig"); if(!f) return; if(swipeX !== null && Math.abs(e.clientX - swipeX) > 8) return; openLB(f.dataset.img); });
+document.addEventListener("keydown", e => {
+  if(e.key === "Escape") closeLB();
+  if((e.key === "Enter" || e.key === " ") && e.target.classList && e.target.classList.contains("fig")){ e.preventDefault(); openLB(e.target.dataset.img); }
+});
+$("#lbClose").onclick = closeLB;
+
+/* ====== GEMINI ====== */
+const API = "https://generativelanguage.googleapis.com/v1beta";
+let API_KEY = "";               // chỉ giữ trong bộ nhớ, không ghi localStorage
+function getKey(){ return API_KEY; }
+function keyMsg(html, cls){ $("#keyMsg").innerHTML = html ? `<div class="${cls}">${html}</div>` : ""; }
+function keyState(text, cls){ const e = $("#keyState"); e.textContent = text || ""; e.className = "keystate " + (cls || "wait"); }
+$("#showKey").onclick = () => { const i = $("#apiKey"); const show = i.type === "password"; i.type = show ? "text" : "password"; $("#showKey").textContent = show ? "Ẩn" : "Hiện"; $("#showKey").setAttribute("aria-pressed", show); };
+$("#apiKey").addEventListener("input", () => {
+  const v = $("#apiKey").value.trim();
+  if(API_KEY && v !== API_KEY) keyState("Key đã thay đổi — bấm Lưu để dùng key mới.", "wait");
+  else if(API_KEY) keyState("✓ Đã lưu cho phiên này.", "ok");
+  else keyState("", "wait");
+});
+$("#apiKey").addEventListener("keydown", e => { if(e.key === "Enter"){ e.preventDefault(); $("#saveKey").click(); } });
+$("#model").onchange = e => { LS.set(MODELSTORE, e.target.value); updateAIState(); };
+function clearKey(){ API_KEY = ""; $("#apiKey").value = ""; $("#apiKey").type = "password"; $("#showKey").textContent = "Hiện"; keyState(""); keyMsg(""); updateAIState(); }
+
+function friendlyError(status, body){
+  const m = (body && body.error && body.error.message) || "";
+  if(!navigator.onLine) return "Thiết bị đang không có mạng. Phần chấm điểm vẫn dùng được; khi có mạng hãy thử lại phần AI.";
+  if(status === 400 && /API key/i.test(m)) return "Key không hợp lệ. Kiểm tra lại đã dán đủ cả chuỗi chưa (không thừa dấu cách).";
+  if(status === 400 && /location|region|country/i.test(m)) return "Gemini API chưa hỗ trợ ở khu vực mạng hiện tại.";
+  if(status === 403) return "Key không có quyền dùng Gemini API (có thể key bị khoá hoặc chưa bật API). Thử tạo key mới trong AI Studio.";
+  if(status === 404) return "Không tìm thấy mô hình này. Bấm “Lưu API key” ở đầu trang để tải lại danh sách mô hình, rồi chọn lại.";
+  if(status === 429) return "Đã hết lượt miễn phí tạm thời. Đợi khoảng một phút (hoặc sang ngày) rồi thử lại.";
+  if(status >= 500) return "Máy chủ Gemini đang bận. Thử lại sau ít phút.";
+  return "Lỗi khi gọi Gemini" + (status ? ` (mã ${status})` : "") + (m ? ": " + m : ".");
+}
+async function gfetch(url, opts, ms){
+  const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), ms || 90000);
+  try{
+    const r = await fetch(url, Object.assign({}, opts, {signal: ctl.signal}));
+    let body = null; try{ body = await r.json(); }catch(e){}
+    return {status: r.status, ok: r.ok, body};
+  }catch(e){
+    return {status: 0, ok: false, body: {error: {message: e.name === "AbortError" ? "Quá thời gian chờ." : "Không kết nối được tới máy chủ."}}};
+  }finally{ clearTimeout(t); }
+}
+
+const MODEL_LABELS = {"gemini-flash-lite-latest":"Gemini Flash-Lite — miễn phí, nhẹ & nhanh nhất","gemini-flash-latest":"Gemini Flash — giải thích kỹ hơn, vẫn miễn phí"};
+function fillModels(list){
+  const sel = $("#model"), cur = sel.value;
+  const known = Object.keys(MODEL_LABELS).filter(n => !list || list.includes(n));
+  const others = (list || []).filter(n => !MODEL_LABELS[n] && /flash|pro/i.test(n)).sort().reverse();
+  sel.innerHTML = known.map(n => `<option value="${n}">${esc(MODEL_LABELS[n])}</option>`).join("")
+    + (others.length ? `<optgroup label="Mô hình khác key này dùng được">${others.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join("")}</optgroup>` : "");
+  const all = [...sel.options].map(o => o.value);
+  sel.value = all.includes(cur) ? cur : (all.find(n => /flash-lite/i.test(n)) || all[0]);
+  LS.set(MODELSTORE, sel.value);
+}
+$("#saveKey").onclick = async () => {
+  const key = $("#apiKey").value.trim();
+  if(!key){ keyState("Hãy dán API key vào ô trước.", "bad"); keyMsg(""); return; }
+  if(/\s/.test(key)){ keyState("Key có khoảng trắng ở giữa — kiểm tra lại khi dán.", "bad"); return; }
+  $("#saveKey").disabled = true; keyMsg("");
+  keyState("Đang kiểm tra key…", "wait");
+  if(!navigator.onLine){
+    API_KEY = key; $("#saveKey").disabled = false;
+    keyState("✓ Đã lưu cho phiên này (chưa kiểm tra được vì không có mạng).", "ok"); updateAIState(); return;
+  }
+  const r = await gfetch(`${API}/models?pageSize=200`, {headers: {"x-goog-api-key": key}}, 20000);
+  $("#saveKey").disabled = false;
+  if(r.ok){
+    const models = ((r.body && r.body.models) || [])
+      .filter(m => (m.supportedGenerationMethods || []).includes("generateContent"))
+      .map(m => m.name.replace(/^models\//, ""))
+      .filter(n => /gemini/i.test(n) && !/(image|tts|audio|live|embedding|vision|aqa|robotics|computer)/i.test(n));
+    if(models.length) fillModels(models);
+    API_KEY = key; keyState("✓ Đã lưu cho phiên này.", "ok");
+  }else if(r.status === 0){
+    API_KEY = key; keyState("✓ Đã lưu cho phiên này (chưa kiểm tra được với Google).", "ok");
+  }else{
+    API_KEY = ""; keyState("Chưa lưu.", "bad"); keyMsg(esc(friendlyError(r.status, r.body)), "err");
+  }
+  updateAIState();
+};
+function updateAIState(){
+  const st = $("#aiKeyState"); if(!st) return;
+  const lab = $("#model").selectedOptions[0] ? $("#model").selectedOptions[0].textContent.split(" — ")[0] : $("#model").value;
+  st.innerHTML = API_KEY ? `Đang dùng key đã lưu ở đầu trang · mô hình <b>${esc(lab)}</b>.`
+    : `Chưa có API key. <a href="#aiSetup">Nhập key ở mục “Trợ lý AI Gemini” đầu trang</a> rồi quay lại đây.`;
+  $("#askAI").disabled = !state.graded;
+}
+
+const SYS = CFG.sys + `
+
+Chỉ trả về MỘT đối tượng JSON hợp lệ, không kèm chữ nào khác, theo đúng cấu trúc:
+{
+ "nhan_xet_chung": "2-3 câu nhận xét tổng quát, động viên, nêu điểm mạnh và lỗ hổng chính",
+ "giai_thich": [
+   {"cau": <số câu>,
+    "vi_sao_sai": "chỉ ra chính xác nhầm lẫn khiến em chọn phương án đó (hoặc vì sao bỏ trống là mất điểm), 1-3 câu",
+    "quy_tac": "quy tắc, định nghĩa hoặc khái niệm của buổi áp dụng, phát biểu ngắn gọn",
+    "vi_du": "${CFG.ai_vi_du}",
+    "meo_nho": "một mẹo ngắn để không nhầm lần sau"}
+ ],
+ "ke_hoach_tuan_toi": {
+   "uu_tien": ["tên nhóm cần luyện nhất", "..."],
+   "viec_can_lam": [
+     {"buoi": "Thứ 2 (hoặc Ngày 1)", "noi_dung": "việc cụ thể, có tham chiếu slide/bài tập được cung cấp", "thoi_luong": "ví dụ 20 phút", "dau_hieu_hoan_thanh": "làm sao biết đã đạt"}
+   ],
+   "bai_tu_luyen": "${CFG.ai_bai_tu_luyen}"
+ }
+}
+Mỗi câu sai/bỏ trống phải có đúng một phần tử trong "giai_thich", theo thứ tự số câu. Kế hoạch gồm 4-6 việc, tổng khoảng 2-3 giờ trong tuần, ưu tiên nhóm có tỉ lệ đúng thấp nhất.`;
+
+function buildPrompt(){
+  const r = state.result;
+  const stats = GROUPS.filter(g => r.groups[g.id]).map(g => {
+    const x = r.groups[g.id]; return `- ${g.name}: ${x.correct}/${x.total} đúng (${Math.round(x.correct / x.total * 100)}%). Tài liệu ôn: ${g.ref}`;
+  }).join("\n");
+  const wrong = r.per.filter(p => !p.ok).map(p => {
+    const q = QMAP[p.n], k = KEY[p.n];
+    return `### Câu ${p.n} (nhóm: ${q.gs.map(g => GMAP[g].name).join("; ")})
+Đề: ${q.t.replace(/\*\*/g, "")}${q.f ? " [câu có hình; nội dung hình được mô tả trong đề và lời giải]" : ""}
+${q.type === "fill" ? "Đoạn mã (ô trống ghi (1), (2)...):\n" + q.code.map(l => l.map(x => typeof x === "string" ? x : `(${x.b + 1})____`).join(" ")).join("\n") + "\nDanh sách từ khoá (có nhiễu): " + q.bank.join(", ")
+  + "\nHọc sinh điền: " + ansText(p.n, p.chosen) + "\nĐáp án đúng: " + keyText(p.n) + (KEY[p.n].alt ? "\nCũng chấp nhận: " + KEY[p.n].alt.map(x => x.join(" ")).join("; ") : "")
+  : (q.code ? "Đoạn lệnh:\n" + q.code.map(l => l.join(" ")).join("\n") + "\n" : "") + q.o.map((o,i) => `${LET[i]}. ${o}`).join("\n") + `\nHọc sinh chọn: ${p.chosen || "(bỏ trống)"}\nĐáp án đúng: ${p.key}`}
+Lời giải của giảng viên: ${k.e}${k.afc ? "\nHình đáp án: " + k.afc : ""}`;
+  }).join("\n\n");
+  return `Bài làm: ${CFG.result_title}, ${modeLabel(state.mode)}; đúng ${r.correct}/${r.total}; điểm ${fmtScore(r.score)}/10.
+
+Tỉ lệ đúng theo ${CFG.groups_label}:
+${stats}
+
+${wrong ? "Các câu sai hoặc bỏ trống:\n\n" + wrong : "Học sinh đúng tất cả. Mảng giai_thich để rỗng; kế hoạch tuần tới hãy gợi ý luyện nâng cao (" + CFG.ai_advanced + ")."}`;
+}
+
+function parseJSON(text){
+  let t = text.trim().replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/, "");
+  try{ return JSON.parse(t); }catch(e){}
+  const a = t.indexOf("{"), b = t.lastIndexOf("}");
+  if(a >= 0 && b > a){ try{ return JSON.parse(t.slice(a, b + 1)); }catch(e){} }
+  return null;
+}
+
+$("#askAI").onclick = async () => {
+  const out = $("#aiOut");
+  if(!state.graded){ out.innerHTML = `<div class="err">Hãy nộp bài trước.</div>`; return; }
+  const key = getKey();
+  if(!key){ out.innerHTML = `<div class="err">Chưa có API key. Lên mục “Trợ lý AI Gemini” ở đầu trang, dán key và bấm <b>Lưu API key</b>, rồi quay lại bấm nút này.</div>`; $("#howKey").open = true; $("#aiSetup").scrollIntoView({behavior:"smooth"}); return; }
+  if(!navigator.onLine){ out.innerHTML = `<div class="err">${friendlyError(0)}</div>`; return; }
+  const model = $("#model").value || "gemini-flash-lite-latest";
+  $("#askAI").disabled = true;
+  out.innerHTML = `<p class="note"><span class="spinner"></span>AI đang đọc bài làm (thường 10–40 giây)…</p>`;
+  const body = {
+    systemInstruction: {parts: [{text: SYS}]},
+    contents: [{role: "user", parts: [{text: buildPrompt()}]}],
+    generationConfig: {temperature: 0.4, responseMimeType: "application/json"}
+  };
+  const r = await gfetch(`${API}/models/${encodeURIComponent(model)}:generateContent`, {
+    method: "POST", headers: {"Content-Type": "application/json", "x-goog-api-key": key}, body: JSON.stringify(body)
+  }, 120000);
+  $("#askAI").disabled = false;
+  if(!r.ok){ out.innerHTML = `<div class="err">${esc(friendlyError(r.status, r.body))}</div>`; return; }
+  const cand = r.body && r.body.candidates && r.body.candidates[0];
+  const text = cand && cand.content && (cand.content.parts || []).filter(p => !p.thought && p.text).map(p => p.text).join("");
+  if(!text){
+    const why = (r.body && r.body.promptFeedback && r.body.promptFeedback.blockReason) || (cand && cand.finishReason) || "";
+    out.innerHTML = `<div class="err">AI không trả lời${why ? " (" + esc(why) + ")" : ""}. Thử bấm lại.</div>`; return;
+  }
+  const data = parseJSON(text);
+  state.ai = data ? {json: data} : {raw: text};
+  saveState();
+  renderAI(state.ai);
+};
+
+function el(tag, cls, text){ const e = document.createElement(tag); if(cls) e.className = cls; if(text != null) e.textContent = text; return e; }
+function renderAI(ai){
+  const out = $("#aiOut"); out.innerHTML = "";
+  if(ai.raw){ out.appendChild(el("h3", null, "Phản hồi của AI")); out.appendChild(el("pre", "mono", ai.raw)); return; }
+  const d = ai.json || {};
+  out.appendChild(el("h3", null, "Nhận xét của trợ giảng AI"));
+  if(d.nhan_xet_chung) out.appendChild(el("p", null, d.nhan_xet_chung));
+  const items = Array.isArray(d.giai_thich) ? d.giai_thich : [];
+  if(items.length) out.appendChild(el("h3", null, "Giải thích từng lỗi"));
+  items.forEach(it => {
+    const box = el("div", "ai-item");
+    const n = +it.cau; const p = state.result.per.find(x => x.n === n);
+    box.appendChild(el("h4", null, `Câu ${it.cau}` + (p ? (isFill(p.n) ? ` — em điền ${shortAns(p.n, p.chosen)}, đúng là ${KEY[p.n].k.join("/")}` : ` — em chọn ${p.chosen || "(trống)"}, đúng là ${p.key}`) : "")));
+    const dl = el("dl");
+    [["Vì sao sai", it.vi_sao_sai], ["Quy tắc áp dụng", it.quy_tac], ["Ví dụ", it.vi_du], ["Mẹo nhớ", it.meo_nho]].forEach(([k, v]) => {
+      if(!v) return; dl.appendChild(el("dt", null, k)); dl.appendChild(el("dd", null, String(v)));
+    });
+    box.appendChild(dl); out.appendChild(box);
+  });
+  const plan = d.ke_hoach_tuan_toi;
+  if(plan){
+    out.appendChild(el("h3", null, "Việc cần luyện tuần tới"));
+    if(Array.isArray(plan.uu_tien) && plan.uu_tien.length) out.appendChild(el("p", null, "Ưu tiên: " + plan.uu_tien.join(" → ")));
+    const ol = el("ol", "plan");
+    (plan.viec_can_lam || []).forEach(v => {
+      const li = el("li");
+      li.appendChild(el("b", null, [v.buoi, v.thoi_luong].filter(Boolean).join(" · ") + ": "));
+      li.appendChild(document.createTextNode(v.noi_dung || ""));
+      if(v.dau_hieu_hoan_thanh){ li.appendChild(el("br")); li.appendChild(el("span", "note", "Hoàn thành khi: " + v.dau_hieu_hoan_thanh)); }
+      ol.appendChild(li);
+    });
+    out.appendChild(ol);
+    if(plan.bai_tu_luyen){ const b = el("div", "ai-item"); b.appendChild(el("h4", null, "Bài tự luyện")); b.appendChild(el("p", "mono", plan.bai_tu_luyen)); out.appendChild(b); }
+  }
+  out.appendChild(el("p", "note", "Nội dung do AI tạo, có thể sai sót. Khi AI và lời giải của giảng viên khác nhau, lấy lời giải của giảng viên làm chuẩn."));
+}
+
+/* ====== KHỞI ĐỘNG ====== */
+function init(){
+  loadState();
+  LS.del(KEYSTORE); // xoá key do bản cũ có thể đã ghi nhớ
+  $("#apiKey").value = ""; // chặn trình duyệt tự điền lại sau khi tải lại trang
+  const m = LS.get(MODELSTORE); if(m){ const sel = $("#model"); if(![...sel.options].some(o => o.value === m)) sel.add(new Option(m, m)); sel.value = m; }
+  updateAIState();
+  if(!PACK12.length) state.mode = "full";
+  renderModes(); setModeRadio(); renderLegend();
+  ["hoTen","maSV","lop"].forEach(id => $("#" + id).value = state.info[id] || "");
+  renderQuestions();
+  if(location.hash === "#kiemtra") runSelfTest();
+}
+
+/* ====== CHẾ ĐỘ TỰ KIỂM TRA CHO GIẢNG VIÊN: mở file với đuôi #kiemtra ====== */
+function runSelfTest(){
+  SAVE_ENABLED = false;
+  const saved = JSON.parse(JSON.stringify(state));
+  const rows = []; const T = (name, ok, detail) => rows.push({name, ok, detail: detail || ""});
+  const all = Q.map(q => q.n), N = all.length;
+  // 1. Dữ liệu so với phiếu
+  T(`Có đủ ${N} câu, đánh số 1–${N}`, N === CFG.n && all.every((n,i) => n === i + 1));
+  const mcQ = Q.filter(q => q.type !== "fill"), fillQ = Q.filter(q => q.type === "fill");
+  if(mcQ.length) T(`${mcQ.length} câu chọn: mỗi câu 4 phương án, đáp án thuộc A–D`, mcQ.every(q => q.o.length === 4 && LET.includes(KEY[q.n].k)));
+  if(fillQ.length){
+    const cnt = (arr) => arr.reduce((m, w) => (m[w] = (m[w] || 0) + 1, m), {});
+    const bad = fillQ.filter(q => { const nb = q.code.flat().filter(x => typeof x !== "string").length, bc = cnt(q.bank);
+      return nb !== KEY[q.n].k.length || [KEY[q.n].k].concat(KEY[q.n].alt || []).some(k => Object.entries(cnt(k)).some(([w, c]) => (bc[w] || 0) < c)); }).map(q => q.n);
+    T(`${fillQ.length} câu điền mã: số ô = số từ đáp án, từ đáp án đều có trong danh sách từ khoá`, bad.length === 0, bad.join(" "));
+  }
+  const keyStr = all.map(n => isFill(n) ? KEY[n].k.join("/") : KEY[n].k).join(" ");
+  if(CFG.doc_key) T("Đáp án trong file khớp chuỗi/bảng đáp án của phiếu", keyStr === CFG.doc_key, keyStr);
+  if(CFG.dist){ const dist = LET.map(L => all.filter(n => KEY[n].k === L).length).join(",");
+    T(`Phân bố đáp án khớp phiếu (A,B,C,D = ${CFG.dist})`, dist === CFG.dist, dist); }
+  if(PACK12.length && CFG.pack_key) T("Đáp án gói rút gọn khớp phiếu", PACK12.map(n => KEY[n].k).join("") === CFG.pack_key, PACK12.map(n => KEY[n].k).join(""));
+  T("Mọi hình đề, hình đáp án, hình quy ước đều có trong file",
+    Q.every(q => !q.f || IMG[q.f]) && all.every(n => !KEY[n].af || IMG[KEY[n].af]) &&
+    [...(CFG.legend_html || "").matchAll(/\{\{IMG:(\d+)/g)].every(m => IMG[m[1]]));
+  T("Mỗi câu thuộc ít nhất một nhóm có thật", Q.every(q => q.gs.length > 0 && q.gs.every(g => GMAP[g])));
+  if(CFG.cov) T("Câu thuộc từng nhóm khớp bảng phủ của phiếu",
+    GROUPS.every(g => JSON.stringify(Q.filter(q => q.gs.includes(g.id)).map(q => q.n)) === JSON.stringify(CFG.cov[g.id] || [])));
+  // 2. Chấm điểm thuần, từng bộ câu
+  const modes = PACK12.length ? ["full", "p12"] : ["full"];
+  modes.forEach(mode => {
+    const ids = idsFor(mode), M = ids.length, label = `[${modeLabel(mode)}]`;
+    const right = {}; ids.forEach(n => right[n] = rightAns(n));
+    const g1 = grade(right, ids);
+    T(`${label} Điền đúng hết → ${M}/${M}, 10 điểm`, g1.correct === M && g1.score === 10, `${g1.correct}/${g1.total}, ${fmtScore(g1.score)} điểm`);
+    T(`${label} Điền đúng hết → mọi nhóm 100%`, Object.values(g1.groups).every(g => g.correct === g.total));
+    if(mode === "p12") T(`${label} Điền đúng hết → Đạt tiêu chí`, !!(g1.pass && g1.pass.ok));
+    const wrong = {}; ids.forEach(n => wrong[n] = wrongAns(n));
+    const g0 = grade(wrong, ids);
+    T(`${label} Điền sai hết → 0 điểm`, g0.correct === 0 && g0.score === 0);
+    T(`${label} Bỏ trống hết → 0 điểm`, grade({}, ids).score === 0);
+    const half = {}; ids.forEach((n,i) => half[n] = i % 2 ? wrong[n] : right[n]);
+    const gh = grade(half, ids), H = Math.ceil(M / 2);
+    T(`${label} Đúng ${H} câu xen kẽ → ${H}/${M}, ${fmtScore(H * 10 / M)} điểm`, gh.correct === H && Math.abs(gh.score - H * 10 / M) < 1e-9, `${gh.correct}/${gh.total}, ${fmtScore(gh.score)} điểm`);
+  });
+  if(PACK12.length && PACK12_RULE.need.length){
+    const r0 = PACK12_RULE.need[0], p = {};
+    PACK12.forEach(n => p[n] = r0.q.includes(n) ? wrongAns(n) : rightAns(n));
+    const gp = grade(p, PACK12);
+    T(`[gói] Sai hết câu nhóm ${r0.name} → Chưa đạt, báo thiếu ${r0.name}`, !!(gp.pass && !gp.pass.ok && gp.pass.missing.includes(r0.name)), gp.pass ? gp.pass.missing.join(", ") : "");
+  }
+  // 3. Từng câu: chỉ phương án đúng mới được điểm
+  const bad = []; let cases = 0;
+  all.filter(n => !isFill(n)).forEach(n => LET.forEach(L => { cases++; const g = grade({[n]: L}, [n]); if((g.correct === 1) !== (L === KEY[n].k)) bad.push(n + L); }));
+  if(mcQ.length) T(`Câu chọn: chỉ phương án đúng được tính điểm (${cases} trường hợp)`, bad.length === 0, bad.join(" "));
+  const badF = []; let casesF = 0;
+  all.filter(isFill).forEach(n => {
+    const r = rightAns(n), bank = QMAP[n].bank;
+    casesF++; if(grade({[n]: r}, [n]).correct !== 1) badF.push(n + ":đúng");
+    r.forEach((_, b) => {
+      const e = r.slice(); e[b] = null; casesF++; if(grade({[n]: e}, [n]).correct !== 0) badF.push(n + ":trống" + (b + 1));
+      bank.forEach((w, j) => { if(r.includes(j) || w === KEY[n].k[b]) return; const x = r.slice(); x[b] = j; casesF++;
+        if(grade({[n]: x}, [n]).correct === 1 && !isRight(n, x)) badF.push(n + ":" + (b + 1)); if(grade({[n]: x}, [n]).correct === 1 && !(KEY[n].alt || []).length) badF.push(n + ":" + (b + 1) + w); });
+    });
+  });
+  if(fillQ.length) T(`Câu điền mã: chỉ tính đúng khi mọi ô đúng; thiếu một ô hoặc thay một ô bằng từ khác đều sai (${casesF} trường hợp)`, badF.length === 0, badF.join(" "));
+  // 4. Đầu–cuối trên giao diện: bấm chọn đúng hết rồi bấm Nộp
+  modes.forEach(mode => {
+    state = {mode, answers:{}, graded:false, result:null, info:{hoTen:"",maSV:"",lop:""}, ai:null}; warnedOnce = false;
+    setModeRadio(); document.body.classList.remove("graded"); $("#submitBox").classList.remove("hidden");
+    renderQuestions();
+    const ids = idsFor(mode), M = ids.length;
+    ids.forEach(n => {
+      if(!isFill(n)){ document.querySelector(`#q${n} input[value="${KEY[n].k}"]`).click(); return; }
+      rightAns(n).forEach((i, b) => { const sel = document.querySelector(`#q${n} select.blank[data-b="${b}"]`); sel.value = String(i); sel.dispatchEvent(new Event("change", {bubbles: true})); });
+    });
+    $("#submitBtn").click();
+    const sv = $("#scoreVal") && $("#scoreVal").textContent, cnt = $("#scoreCount") && $("#scoreCount").textContent;
+    T(`[Giao diện, ${modeLabel(mode)}] Bấm chọn đúng hết + Nộp → hiện 10 / 10`, sv === "10" && cnt.includes(`${M}/${M}`), `Hiển thị: ${sv} điểm ${cnt}`);
+  });
+  // khôi phục bài đang làm
+  state = saved; SAVE_ENABLED = true; warnedOnce = false;
+  document.body.classList.remove("graded"); $("#resultCard").classList.add("hidden"); $("#aiResult").classList.add("hidden"); $("#submitBox").classList.remove("hidden");
+  setModeRadio(); renderQuestions();
+  const pass = rows.every(r => r.ok);
+  const box = $("#selftest");
+  box.innerHTML = `<h2>Tự kiểm tra chấm điểm: <span class="${pass ? "P" : "F"}">${pass ? "TẤT CẢ ĐẠT" : "CÓ LỖI"}</span> (${rows.filter(r => r.ok).length}/${rows.length})</h2>
+    <table><thead><tr><th>Kiểm tra</th><th>Kết quả</th></tr></thead><tbody>${rows.map(r => `<tr><td>${esc(r.name)}${r.detail ? `<br><span class="note">${esc(r.detail)}</span>` : ""}</td><td class="${r.ok ? "P" : "F"}">${r.ok ? "ĐẠT" : "LỖI"}</td></tr>`).join("")}</tbody></table>
+    <p class="note">Chế độ này không ghi đè bài đang làm. Bỏ “#kiemtra” khỏi địa chỉ để trở lại bình thường.</p>`;
+  box.classList.remove("hidden");
+  window.__SELFTEST__ = {pass, rows};
+  console.log("SELFTEST", pass ? "PASS" : "FAIL", rows);
+}
+init();
+</script>
+</body>
+</html>
